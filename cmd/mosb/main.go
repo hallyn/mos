@@ -15,6 +15,7 @@ func main() {
 	app.Version = Version
 	app.Commands = []cli.Command{
 		isoCmd,
+		manifestCmd,
 		sociCmd,
 	}
 	app.Flags = []cli.Flag{

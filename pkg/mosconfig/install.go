@@ -352,3 +352,29 @@ func InitializeMos(ctx *cli.Context) error {
 
 	return nil
 }
+
+func PublishManifest(ctx *cli.Context) error {
+	cert := ctx.String("cert")
+	if cert == "" {
+		return fmt.Errorf("Certificate filename is required")
+	}
+	key := ctx.String("key")
+	if key == "" {
+		return fmt.Errorf("Key filename is required")
+	}
+	repo := ctx.String("repo")
+	if cert == "" {
+		return fmt.Errorf("Repo is required")
+	}
+	destpath := ctx.String("dest-path")
+	if cert == "" {
+		return fmt.Errorf("Repo is required")
+	}
+	infile := ctx.String("file")
+	if file == "" {
+		return fmt.Errorf("file is required")
+	}
+
+	// TODO not implemented
+	return nil
+}
