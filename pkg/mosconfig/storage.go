@@ -354,6 +354,8 @@ func (a *AtomfsStorage) ImportTarget(src string, target *Target) error {
 	ociDir := filepath.Join(src, "oci")
 	var err error
 	switch {
+	case strings.HasPrefix(src, "docker://"):
+		err = a.copyRemote(src, target)
 	case PathExists(ociDir):
 		err = a.copyLocalOci(ociDir, target)
 	case PathExists(zotDir):
@@ -400,6 +402,21 @@ func (a *AtomfsStorage) copyLocalOci(ociDir string, target *Target) error {
 	log.Infof("copying %s from local oci ('%s') into zot as '%s'", target.ServiceName, src, dest)
 
 	copyOpts := lib.ImageCopyOpts{Src: src, Dest: dest, Progress: os.Stdout}
+	if err := lib.ImageCopy(copyOpts); err != nil {
+		return fmt.Errorf("failed copying layer %v: %w", target, err)
+	}
+
+	return nil
+}
+
+func (a *AtomfsStorage) copyRemote(image string, target *Target) error {
+	tpath := filepath.Join(a.zotPath, target.ImagePath)
+	dest := fmt.Sprintf("oci:%s:%s", tpath, target.Version)
+	err := EnsureDir(tpath)
+	if err != nil {
+		return fmt.Errorf("Failed creating local zot directory %q: %w", tpath, err)
+	}
+	copyOpts := lib.ImageCopyOpts{Src: image, Dest: dest, Progress: os.Stdout, SrcSkipTLS: true}
 	if err := lib.ImageCopy(copyOpts); err != nil {
 		return fmt.Errorf("failed copying layer %v: %w", target, err)
 	}

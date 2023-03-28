@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/project-machine/mos/pkg/mosconfig"
 	"github.com/urfave/cli"
 )
@@ -13,11 +11,6 @@ var installCmd = cli.Command{
 	Action: doInstall,
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "f, file",
-			Usage: "File from which to read the install manifest",
-			Value: "./install.yaml",
-		},
-		cli.StringFlag{
 			Name:  "config-dir, c",
 			Usage: "Directory where mos config is found",
 			Value: "/config",
@@ -27,22 +20,16 @@ var installCmd = cli.Command{
 			Usage: "Directory under which atomfs store is kept",
 			Value: "/atomfs-store",
 		},
+		cli.StringFlag{
+			Name:  "ca-path",
+			Usage: "Path to a manifest CA file.",
+			Value: "/factory/secure/manifestCa.pem",
+		},
 	},
 }
 
 func doInstall(ctx *cli.Context) error {
-	// Expect config, scratch-writes, and atomfs-store to exist
-	store := ctx.String("atomfs-store")
-	if !mosconfig.PathExists(store) {
-		return fmt.Errorf("atomfs store not found")
-	}
-
-	config := ctx.String("config-dir")
-	if !mosconfig.PathExists(config) {
-		return fmt.Errorf("mos config directory not found")
-	}
-
-	if err := mosconfig.InitializeMos(store, config, ctx.String("file")); err != nil {
+	if err := mosconfig.InitializeMos(ctx); err != nil {
 		return err
 	}
 

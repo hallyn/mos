@@ -1,82 +1,354 @@
 package mosconfig
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+	ispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func InitializeMos(storeDir, configDir, configFile string) error {
-	// We must have $basedir/install.yml and $basedir/cert.pem
-	baseDir := filepath.Dir(configFile)
-	cPath := filepath.Join(baseDir, "manifestCert.pem")
-	sPath := filepath.Join(baseDir, "install.yaml.signed")
-	// TODO - the next line is not quite right.  The manifestCA.pem
-	// should simply be in / in the signed initrd.  Since we're not
-	// there yet with iso-bootkit, use it from the isodir for
-	// testing.
-	caPath := filepath.Join(baseDir, "manifestCA.pem")
-	if !PathExists(configFile) || !PathExists(cPath) || !PathExists(sPath) || !PathExists(caPath) {
-		return fmt.Errorf("Install manifest or certificate missing")
+type ociurl struct {
+	name    string // the oci name (<name> in distribution spec)- e.g. foo/image
+	tag     string // the oci tag, e.g. 1.0.0
+	mDigest string // the digest for this image's manifest
+	fDigest string // the digest for this file's contents - the actual blob digest
+}
+
+func (r *ocirepo) pickUrl(base string) (ociurl, error) {
+	url := ociurl{}
+	base = dropURLPrefix(base)
+	s := strings.SplitN(base, "/", 2)
+	if len(s) != 2 {
+		return url, errors.Errorf("Failed parsing oci repo url: no '/'in %q", base)
+	}
+	s = strings.SplitN(s[1], ":", 2)
+	if len(s) != 2 {
+		return url, errors.Errorf("Failed parsing oci repo url: no ':'in %q", base)
+	}
+	url.name = s[0]
+	url.tag = s[1]
+
+	// Get the image digests we need from,  e.g.
+	// http://0.0.0.0:18080/v2/machine/install/manifests/1.0.0
+	u := fmt.Sprintf("http://%s/v2/%s/manifests/%s", r.addr, url.name, url.tag)
+	resp, err := http.Get(u)
+	if err != nil {
+		return url, errors.Wrapf(err, "Failed connecting to %q", u)
+	}
+	if resp.StatusCode != 200 {
+		return url, errors.Errorf("Bad status code connecting to %q: %d", u, resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	// This is the digest we need to use to get the list of referrers
+	url.mDigest = resp.Header.Get("Docker-Content-Digest")
+	if url.mDigest == "" {
+		return url, errors.Errorf("No Docker-Content-Digest received")
+	}
+
+	// Read the actual ispec.Index and get the Digest for Layer 1 - that
+	// is the actual digest of the blob we want
+	manifest := ispec.Manifest{}
+	err = json.NewDecoder(resp.Body).Decode(&manifest)
+	if err != nil {
+		    return url, errors.Wrapf(err, "Failed parsing the install artifact manifest")
+	}
+	if len(manifest.Layers) == 0 {
+		return url, errors.Errorf("No layers found in the install artifact manifest!")
+	}
+	if len(manifest.Layers) > 1 {
+		return url, errors.Errorf("More than one layer found in the install artifact manifest.")
+	}
+
+	url.fDigest = manifest.Layers[0].Digest.String()
+
+	return url, nil
+}
+
+type ocirepo struct {
+	addr string // 10.0.2.2:5000 or /mnt/oci
+}
+
+func dropURLPrefix(url string) string {
+	prefixes := []string{"docker://", "http://", "https://"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(url, p) {
+			url = url[len(p):]
+		}
+	}
+	return url
+}
+
+// Given a 10.0.2.2:5000/foo/install.yaml, set addr to
+// http://10.0.2.2:5000, and check for connection using
+// http://10.0.2.2:5000/v2
+func NewOciRepo(base string) (*ocirepo, error) {
+	r := ocirepo{}
+	base = dropURLPrefix(base)
+	s := strings.SplitN(base, "/", 2)
+	if len(s) != 2 {
+		return &r, errors.Errorf("Failed parsing oci repo url: no '/' in %q", base)
+	}
+	base = s[0]
+
+	url := "http://" + base + "/v2/"
+	resp, err := http.Get(url)
+	if err != nil {
+		return &r, errors.Errorf("Failed connecting to %q", url)
+	}
+	if resp.StatusCode != 200 {
+		return &r, errors.Errorf("Bad status code %d connecting to %q: %d", url, resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	r.addr = base
+	return &r, nil
+}
+
+func (r *ocirepo) FetchFile(path string, dest string) error {
+	url := "http://" + r.addr + "/v2/" + path
+	resp, err := http.Get(url)
+	if err != nil {
+		return errors.Errorf("Failed connecting to %q", url)
+	}
+	if resp.StatusCode != 200 {
+		return errors.Errorf("Bad status code connecting to %q: %d", url, resp.StatusCode)
+	}
+	source := resp.Body
+	defer source.Close()
+
+	outf, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer outf.Close()
+
+	_, err = io.Copy(outf, source)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ocirepo) FetchInstall(url ociurl, dest string) error {
+	u := url.name + "/blobs/" + url.fDigest
+	return r.FetchFile(u, dest)
+}
+
+const (
+	pubkeyArtifact = "vnd.machine.pubkeycrt"
+	sigArtifact = "vnd.machine.signature"
+)
+
+// end-12b     GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>     200     404/400
+func (r *ocirepo) GetReferrers(url ociurl, artifactType string) (ispec.Index, error) {
+	// Now fetch /v2/<name>/referrers/<digest>?artifactType=<artifactType>
+	idx := ispec.Index{}
+	u := fmt.Sprintf("http://%s/v2/%s/referrers/%s?artifactType=%s", r.addr, url.name, url.mDigest, artifactType)
+	resp, err := http.Get(u)
+	if err != nil {
+		return idx, errors.Errorf("Failed connecting to %q", u)
+	}
+	if resp.StatusCode != 200 {
+		return idx, errors.Errorf("Bad status code connecting to %q: %d", u, resp.StatusCode)
+	}
+	body := resp.Body
+	defer body.Close()
+
+	err = json.NewDecoder(body).Decode(&idx)
+	if err != nil {
+		    return idx, errors.Wrapf(err, "Failed parsing the list of referrers")
+	}
+
+	if len(idx.Manifests) == 0 {
+		return idx, errors.Errorf("No manifest for artifact type %v at %#v (queried url %q)", artifactType, url, u)
+	}
+
+	return idx, nil
+}
+
+func (r *ocirepo) fetchArtifact(url ociurl, artifactType, dest string) error {
+	referrer, err := r.GetReferrers(url, artifactType)
+	if err != nil {
+		return errors.Wrapf(err, "Failed getting list of referrers")
+	}
+
+	if len(referrer.Manifests) > 1 {
+		// What do do?  Should we find one right here that the capath can verify?
+		// Probably - but for now, just take the first one.
+		fmt.Println("Warning: multiple referrers found, using first one")
+	}
+
+	digest := referrer.Manifests[0].Digest
+
+	// we have the digest for a manifest whose layers[0] contains
+	// the artifact we're looking for
+	u := fmt.Sprintf("http://%s/v2/%s/blobs/%s", r.addr, url.name, digest)
+	manifest := ispec.Manifest{}
+
+	resp, err := http.Get(u)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return errors.Errorf("bad response code from oci repo")
+	}
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&manifest)
+	if err != nil {
+		return err
+	}
+	if len(manifest.Layers) == 0 {
+		return errors.Errorf("Error parsing artifacts list")
+	}
+
+	digest = manifest.Layers[0].Digest
+	u = fmt.Sprintf("%s/blobs/%s", url.name, digest)
+	return r.FetchFile(u, dest)
+}
+
+func (r *ocirepo) FetchCert(url ociurl, dest string) error {
+	return r.fetchArtifact(url, pubkeyArtifact, dest)
+}
+
+func (r *ocirepo) FetchSignature(url ociurl, dest string) error {
+	return r.fetchArtifact(url, sigArtifact, dest)
+}
+
+// InstallSource represents an install file, its signature, and
+// certificate for verifying the signature, downloaded from an
+// oci repo url and its referrers.
+type InstallSource struct {
+	Basedir  string
+	FilePath string
+	CertPath string
+	SignPath string
+	ocirepo  *ocirepo
+
+	NeedsCleanup bool
+}
+
+// cleaning up is only done if we created the tempdir
+func (is *InstallSource) Cleanup() {
+	if is.NeedsCleanup {
+		os.RemoveAll(is.Basedir)
+		is.NeedsCleanup = false
+	}
+}
+
+func (is *InstallSource) FetchFromZot(inUrl string) error {
+	dir, err := os.MkdirTemp("", "install")
+	if err != nil {
+		return err
+	}
+	is.Basedir = dir
+	is.FilePath = filepath.Join(is.Basedir, "install.yaml") // TODO - switch to json
+	is.CertPath = filepath.Join(is.Basedir, "manifestCert.pem")
+	is.SignPath = filepath.Join(is.Basedir, "install.yaml.signed")
+
+	r, err := NewOciRepo(inUrl)
+	if err != nil {
+		return errors.Wrapf(err, "Error opening OCI repo connection")
+	}
+	is.ocirepo = r
+
+	url, err := r.pickUrl(inUrl)
+	if err != nil {
+		return errors.Wrapf(err, "Error parsing install manifest url")
+	}
+
+	err = r.FetchInstall(url, is.FilePath)
+	if err != nil {
+		return errors.Wrapf(err, "Error fetching the install manifest")
+	}
+
+	err = r.FetchCert(url, is.CertPath)
+	if err != nil {
+		return errors.Wrapf(err, "Error fetching the certificate")
+	}
+
+	err = r.FetchSignature(url, is.SignPath)
+	if err != nil {
+		return errors.Wrapf(err, "Error fetching the signature")
+	}
+
+	is.NeedsCleanup = true
+
+	return nil
+}
+
+func InitializeMos(ctx *cli.Context) error {
+	// Expect config, scratch-writes, and atomfs-store to exist
+	storeDir := ctx.String("atomfs-store")
+	if !PathExists(storeDir) {
+		return errors.Errorf("atomfs store not found")
+	}
+
+	configDir := ctx.String("config-dir")
+	if !PathExists(configDir) {
+		return errors.Errorf("mos config directory not found")
+	}
+
+	args := ctx.Args()
+	if len(args) < 1 {
+		return errors.Errorf("An install source is required.\nUsage: mos install [--config-dir /config] [--atomfs-store /atomfs-store] docker://10.0.2.2:5000/mos/install.yaml:1.0")
+	}
+
+	var is InstallSource
+	defer is.Cleanup()
+
+	err := is.FetchFromZot(args[0])
+	if err != nil {
+		return err
+	}
+
+	caPath := "/manifestCA.pem"
+	if ctx.IsSet("ca-path") {
+		caPath = ctx.String("ca-path")
+	}
+	if !PathExists(caPath) {
+		return errors.Errorf("Install manifest CA missing")
 	}
 
 	mos, err := NewMos(configDir, storeDir)
 	if err != nil {
-		return fmt.Errorf("Error opening manifest: %w", err)
+		return errors.Errorf("Error opening manifest: %w", err)
 	}
 	defer mos.Close()
 
 	// Well, bit of a chicken and egg problem here.  We parse the configfile
 	// first so we can copy all the needed zot images.
-	cf, err := simpleParseInstall(configFile)
+	cf, err := simpleParseInstall(is.FilePath)
 	if err != nil {
-		return fmt.Errorf("Failed parsing install configuration")
+		return errors.Errorf("Failed parsing install configuration")
 	}
 
 	for _, target := range cf.Targets {
-		err = mos.storage.ImportTarget(baseDir, &target)
+		src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, target.ImagePath, target.Version)
+		err = mos.storage.ImportTarget(src, &target)
 		if err != nil {
 			return err
 		}
 	}
 
 	if cf.UpdateType == PartialUpdate {
-		return fmt.Errorf("Cannot install with a partial manifest")
+		return errors.Errorf("Cannot install with a partial manifest")
 	}
 
 	// Finally set up our manifest store
 	// The manifest will be re-read as it is verified.
-	err = mos.initManifest(configFile, cPath, caPath, configDir)
+	err = mos.initManifest(is.FilePath, is.CertPath, caPath, configDir)
 	if err != nil {
-		return fmt.Errorf("Error initializing system manifest: %w", err)
+		return errors.Errorf("Error initializing system manifest: %w", err)
 	}
 
 	return nil
-}
-
-// return the fullname and version from a zot url.  For instance,
-// fullnameFromUrl("docker://zothub.io/c3/base:latest") returns
-// "c3/base", "latest", nil
-func fullnameFromUrl(url string) (string, string, error) {
-	prefix := "docker://"
-	prefixLen := len(prefix)
-	if !strings.HasPrefix(url, prefix) {
-		return "", "", fmt.Errorf("Bad image URL: bad prefix")
-	}
-	url = url[prefixLen:]
-	addrsplit := strings.SplitN(url, "/", 2)
-	if len(addrsplit) < 2 {
-		return "", "", fmt.Errorf("Bad image URL: no address")
-	}
-	tagname := addrsplit[1]
-	idx := strings.LastIndex(tagname, ":")
-	if idx == -1 {
-		return "", "", fmt.Errorf("Bad image URL: no tag")
-	}
-	name := tagname[:idx]
-	version := tagname[idx+1:]
-	if len(name) < 1 || len(version) < 1 {
-		return "", "", fmt.Errorf("Bad image URL: short name or tag")
-	}
-	return name, version, nil
 }

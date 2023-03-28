@@ -118,6 +118,15 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 		return errors.Errorf("bad SOCI layer")
 	}
 
+	is := InstallSource{
+		FilePath: mPath,
+		CertPath: cPath,
+		SignPath: sPath,
+		// No ocirepo
+
+		NeedsCleanup: false,
+	}
+
 	// Set up a temporary storage
 	opts := DefaultMosOptions()
 	opts.CaPath = capath
@@ -128,10 +137,10 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 	if err != nil {
 		return err
 	}
-	manifest, err := ReadVerifyManifest(mPath, cPath, capath, "", s)
+
+	manifest, err := ReadVerifyInstallManifest(is, capath, s)
 	if err != nil {
-		fmt.Printf("Failed verifying %q using %q and %q\n", mPath, cPath, capath)
-		return errors.Wrapf(err, "Verification of manifest on metalayer failed")
+		return errors.Wrapf(err, "Verification of install manifest %#v failed", is)
 	}
 
 	if len(manifest.Targets) != 1 {

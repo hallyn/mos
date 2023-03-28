@@ -40,7 +40,12 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 		return fmt.Errorf("Failed opening git worktree: %w", err)
 	}
 
-	cf, err := ReadVerifyManifest(manifestPath, manifestCert, manifestCA, "", mos.storage)
+	is := InstallSource{
+		FilePath: manifestPath,
+		CertPath: manifestCert,
+		SignPath: manifestPath + ".signed",
+	}
+	cf, err := ReadVerifyInstallManifest(is, manifestCA, mos.storage)
 	if err != nil {
 		return fmt.Errorf("Failed verifying signature on %s: %w", manifestPath, err)
 	}
@@ -255,12 +260,13 @@ func (mos *Mos) readInstallManifest(gitdir string, l map[string]InstallFile, yNa
 	}
 	defer os.RemoveAll(tmpd)
 
-	manifest, err := ReadVerifyManifest(
-		filepath.Join(gitdir, yName),
-		filepath.Join(gitdir, pemName),
-		mos.opts.CaPath,
-		"",
-		mos.storage)
+	is := InstallSource{
+		FilePath: filepath.Join(gitdir, yName),
+		CertPath: filepath.Join(gitdir, pemName),
+		SignPath: filepath.Join(gitdir, fmt.Sprintf("%s.signed", yName)),
+		NeedsCleanup: false,
+	}
+	manifest, err := ReadVerifyInstallManifest(is, mos.opts.CaPath, mos.storage)
 	if err != nil {
 		return InstallFile{}, errors.Wrapf(err, "Failed verifying signature for target %q", yName)
 	}

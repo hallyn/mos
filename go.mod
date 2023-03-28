@@ -2,10 +2,11 @@ module github.com/project-machine/mos
 
 require (
 	github.com/apex/log v1.9.0
+	github.com/cheggaaa/pb/v3 v3.1.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/lxc/lxd v0.0.0-20230109185737-f7ccf0330640
 	github.com/msoap/byline v1.1.1
-	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
+	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/opencontainers/umoci v0.4.8-0.20220412065115-12453f247749
 	github.com/pkg/errors v0.9.1
 	github.com/project-machine/trust v0.0.0-20230211191735-904036e9aeeb
@@ -43,6 +44,7 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/flosch/pongo2 v0.0.0-20200913210552-0d938eb266f3 // indirect
 	github.com/freddierice/go-losetup v0.0.0-20220331141030-7ad00c49b973 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -64,6 +66,8 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220314071908-7b9938e4a08c // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect

@@ -172,24 +172,15 @@ func simpleParseInstall(manifestPath string) (InstallFile, error) {
 }
 
 // Verify an install.yaml manifest.  Return the parsed manifest.
-// manifestPath is the source of the install.yaml.
-// certPath is the signing cert.  This comes from install media.
-// caPath is the CA cert to verify certPath.  This comes from signed initrd.
-// srcDir is only passed if we are in an install or update step.  In this
-//
-//	case, we copy the layers from either srcDir/zot or srcDir/oci, into
-//	persistent storage.  If srcDir is "", then we are parsing an installed
-//	manifest and layers are already installed.
-//
-// s is the storage driver, currently always an atomfs.
-func ReadVerifyManifest(manifestPath, certPath, caPath, srcDir string, s Storage) (InstallFile, error) {
-	bytes, err := os.ReadFile(manifestPath)
+// @is is the InstallSource of the install.yaml.
+// @s is the storage driver, currently always an atomfs.
+func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (InstallFile, error) {
+	bytes, err := os.ReadFile(is.FilePath)
 	if err != nil {
 		return InstallFile{}, fmt.Errorf("Failed reading manifest: %w", err)
 	}
-	sigPath := manifestPath + ".signed"
 
-	if err := trust.VerifyManifest(bytes, sigPath, certPath, caPath); err != nil {
+	if err := trust.VerifyManifest(bytes, is.SignPath, is.CertPath, capath); err != nil {
 		return InstallFile{}, err
 	}
 
@@ -202,13 +193,14 @@ func ReadVerifyManifest(manifestPath, certPath, caPath, srcDir string, s Storage
 	// We've verified the install.yaml contents.  Now verify that the container
 	// image manifest files pointed to have not been altered.
 	for _, t := range manifest.Targets {
-		if srcDir != "" {
+		if is.ocirepo != nil {
 			// Import the layer into our zot store.
 			// We could consider deleting the layer if VerifyTarget fails below.
 			// This is not terribly important as nothing will use it,
 			// unless there's a manifest which is properly signed which refers
 			// to it, in which case we'll regret having deleted it...
-			if err := s.ImportTarget(srcDir, &t); err != nil {
+			src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, t.ImagePath, t.Version)
+			if err := s.ImportTarget(src, &t); err != nil {
 				return InstallFile{}, err
 			}
 		}
