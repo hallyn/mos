@@ -12,6 +12,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/opencontainers/umoci"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 	"stackerbuild.io/stacker/pkg/atomfs"
 	"stackerbuild.io/stacker/pkg/lib"
@@ -336,7 +337,11 @@ func (a *AtomfsStorage) VerifyTarget(t *Target) error {
 
 	realsum := blob.Descriptor.Digest.Encoded()
 	if realsum != t.Digest {
-		return fmt.Errorf("Hash is %q, should be %q", realsum, t.Digest)
+		return errors.Errorf("Hash of target %q is %q, should be %q", t.ServiceName, realsum, t.Digest)
+	}
+
+	if blob.Descriptor.Size != t.Size {
+		return errors.Errorf("Size of target %q should be %u, but is %u", t.ServiceName, t.Size, blob.Descriptor.Size)
 	}
 
 	return nil

@@ -119,6 +119,18 @@ function manifest_shasum {
 	manifest_shasum_from $target zothub/index.json
 }
 
+function manifest_size_from {
+	target=$1
+	jsonindex=$2
+	size=$(jq '.manifests[] | select(.annotations == {"org.opencontainers.image.ref.name": "'"$target"'"}).size' $jsonindex)
+	echo $size
+}
+
+function manifest_size {
+	target=$1
+	manifest_size_from $target zothub/index.json
+}
+
 function write_install_yaml {
 	pathtype=$1
 	spectype=$2

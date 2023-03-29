@@ -2,6 +2,7 @@ package mosconfig
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"github.com/opencontainers/umoci/mutate"
 	"github.com/opencontainers/umoci/oci/casext"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 
 	"github.com/project-machine/trust/pkg/trust"
 
@@ -111,7 +111,7 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 
 	fmt.Printf("XXX - successfully mounted the repo layer\n")
 
-	mPath := filepath.Join(tmpd, "manifest.yaml")
+	mPath := filepath.Join(tmpd, "manifest.json")
 	sPath := mPath + ".signed"
 	cPath := filepath.Join(tmpd, "manifestCert.pem")
 	if !PathExists(mPath) || !PathExists(sPath) || !PathExists(cPath) {
@@ -144,7 +144,7 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 	}
 
 	if len(manifest.Targets) != 1 {
-		return errors.Errorf("manifest.yaml must have precisely one target")
+		return errors.Errorf("manifest.json must have precisely one target")
 	}
 	t := manifest.Targets[0]
 
@@ -292,11 +292,11 @@ func (soci *SOCI) Generate() error {
 	}
 
 	// write the manifest
-	bytes, err := yaml.Marshal(&manifest)
+	bytes, err := json.Marshal(&manifest)
 	if err != nil {
 		return fmt.Errorf("Error marshaling manifest: %w", err)
 	}
-	mPath := filepath.Join(tmpdir, "manifest.yaml")
+	mPath := filepath.Join(tmpdir, "manifest.json")
 	if err := os.WriteFile(mPath, bytes, 0644); err != nil {
 		return fmt.Errorf("Error writing manifest to %q: %w", mPath, err)
 	}

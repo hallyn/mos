@@ -86,7 +86,7 @@ func dropURLPrefix(url string) string {
 	return url
 }
 
-// Given a 10.0.2.2:5000/foo/install.yaml, set addr to
+// Given a 10.0.2.2:5000/foo/install.json, set addr to
 // http://10.0.2.2:5000, and check for connection using
 // http://10.0.2.2:5000/v2
 func NewOciRepo(base string) (*ocirepo, error) {
@@ -250,9 +250,9 @@ func (is *InstallSource) FetchFromZot(inUrl string) error {
 		return err
 	}
 	is.Basedir = dir
-	is.FilePath = filepath.Join(is.Basedir, "install.yaml") // TODO - switch to json
+	is.FilePath = filepath.Join(is.Basedir, "install.json") // TODO - switch to json
 	is.CertPath = filepath.Join(is.Basedir, "manifestCert.pem")
-	is.SignPath = filepath.Join(is.Basedir, "install.yaml.signed")
+	is.SignPath = filepath.Join(is.Basedir, "install.json.signed")
 
 	r, err := NewOciRepo(inUrl)
 	if err != nil {
@@ -299,7 +299,7 @@ func InitializeMos(ctx *cli.Context) error {
 
 	args := ctx.Args()
 	if len(args) < 1 {
-		return errors.Errorf("An install source is required.\nUsage: mos install [--config-dir /config] [--atomfs-store /atomfs-store] docker://10.0.2.2:5000/mos/install.yaml:1.0")
+		return errors.Errorf("An install source is required.\nUsage: mos install [--config-dir /config] [--atomfs-store /atomfs-store] docker://10.0.2.2:5000/mos/install.json:1.0")
 	}
 
 	var is InstallSource
@@ -328,7 +328,7 @@ func InitializeMos(ctx *cli.Context) error {
 	// first so we can copy all the needed zot images.
 	cf, err := simpleParseInstall(is.FilePath)
 	if err != nil {
-		return errors.Errorf("Failed parsing install configuration")
+		return errors.Wrapf(err, "Failed parsing install configuration")
 	}
 
 	for _, target := range cf.Targets {
@@ -371,9 +371,10 @@ func PublishManifest(ctx *cli.Context) error {
 		return fmt.Errorf("Repo is required")
 	}
 	infile := ctx.String("file")
-	if file == "" {
+	if infile == "" {
 		return fmt.Errorf("file is required")
 	}
+	fmt.Printf("Would install using: %s %s %s %s %s", cert, key, repo, destpath, infile)
 
 	// TODO not implemented
 	return nil

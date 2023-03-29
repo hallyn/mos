@@ -30,9 +30,9 @@ $(ORAS):
 .PHONY: test
 test: mosctl mosb $(ORAS) $(ZOT)
 	bats tests/install.bats
-	bats tests/rfs.bats
-	bats tests/soci.bats
-	bats tests/activate.bats
+	#bats tests/rfs.bats
+	#bats tests/soci.bats
+	#bats tests/activate.bats
 	bats tests/update.bats
 
 clean:

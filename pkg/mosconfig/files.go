@@ -1,13 +1,14 @@
 package mosconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	ispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/project-machine/trust/pkg/trust"
-	"gopkg.in/yaml.v2"
 	imagesource "stackerbuild.io/stacker/pkg/types"
 )
 
@@ -51,12 +52,6 @@ func ParseUpdateType(t string) (UpdateType, error) {
 
 const CurrentInstallFileVersion = 1
 
-type MountSpec struct {
-	Source  string `yaml:"source"`
-	Dest    string `yaml:"dest"`
-	Options string `yaml:"options"`
-}
-
 // Only host network supported right now.
 // To do: simple/nat, CNI
 type TargetNetworkType string
@@ -67,7 +62,7 @@ const (
 )
 
 type TargetNetwork struct {
-	Type TargetNetworkType `yaml:"type"`
+	Type TargetNetworkType `json:"type"`
 }
 
 type ServiceType string
@@ -79,14 +74,14 @@ const (
 )
 
 type Target struct {
-	ServiceName  string        `yaml:"service_name"` // name of target
-	ImagePath    string        `yaml:"imagepath"`    // full image repository path
-	Version      string        `yaml:"version"`      // docker or oci version tag
-	ServiceType  ServiceType   `yaml:"service_type"`
-	Network      TargetNetwork `yaml:"network"`
-	NSGroup      string        `yaml:"nsgroup"`
-	Mounts       []*MountSpec  `yaml:"mounts"`
-	Digest       string        `yaml:"digest"`
+	ServiceName  string        `json:"service_name"` // name of target
+	ImagePath    string        `json:"imagepath"`    // full image repository path
+	Version      string        `json:"version"`      // docker or oci version tag
+	ServiceType  ServiceType   `json:"service_type"`
+	Network      TargetNetwork `json:"network"`
+	NSGroup      string        `json:"nsgroup"`
+	Digest       string        `json:"digest"`
+	Size         int64         `json:"size"`
 }
 type InstallTargets []Target
 
@@ -96,26 +91,26 @@ func (t *Target) NeedsIdmap() bool {
 
 // This describes an install manifest
 type InstallFile struct {
-	Version     int            `yaml:"version"`
-	ImageType   ImageType      `yaml:"image_type"`
-	Product     string         `yaml:"product"`
-	Targets     InstallTargets `yaml:"targets"`
-	UpdateType  UpdateType     `yaml:"update_type"`
-	StorageType StorageType    `yaml:"storage_type"`
+	Version     int            `json:"version"`
+	ImageType   ImageType      `json:"image_type"`
+	Product     string         `json:"product"`
+	Targets     InstallTargets `json:"targets"`
+	UpdateType  UpdateType     `json:"update_type"`
+	StorageType StorageType    `json:"storage_type"`
 }
 
 // Note we only do combined uid+gid ranges, range 65536, and only starting at
 // container id 0.
 type IdmapSet struct {
-	Name   string `yaml:"idmap-name"` // This is the NSGroup specified in target
-	Hostid int64  `yaml:"hostid"`
+	Name   string `json:"idmap-name"` // This is the NSGroup specified in target
+	Hostid int64  `json:"hostid"`
 }
 
 // SysTarget exists as an intermediary between a 'system manifest'
 // and an 'install manifest'
 type SysTarget struct {
-	Name   string `yaml:"name"`   // the name of the target
-	Source string `yaml:"source"` // the content address manifest file defining it
+	Name   string `json:"name"`   // the name of the target
+	Source string `json:"source"` // the content address manifest file defining it
 
 	raw         *Target
 	OCIManifest ispec.Manifest
@@ -133,8 +128,8 @@ func (s *SysTargets) Contains(needle SysTarget) (SysTarget, bool) {
 }
 
 type SysManifest struct {
-	UidMaps    []IdmapSet  `yaml:"uidmaps"`
-	SysTargets []SysTarget `yaml:"targets"`
+	UidMaps    []IdmapSet  `json:"uidmaps"`
+	SysTargets []SysTarget `json:"targets"`
 }
 
 func (af *InstallFile) Validate() error {
@@ -160,19 +155,19 @@ func (af *InstallFile) Validate() error {
 func simpleParseInstall(manifestPath string) (InstallFile, error) {
 	bytes, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return InstallFile{}, fmt.Errorf("Failed reading manifest: %w", err)
+		return InstallFile{}, errors.Wrapf(err, "Failed reading manifest")
 	}
 	var manifest InstallFile
-	err = yaml.Unmarshal(bytes, &manifest)
+	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
-		return InstallFile{}, fmt.Errorf("Failed parsing manifest: %w", err)
+		return InstallFile{}, errors.Wrapf(err, "Failed parsing manifest")
 	}
 
 	return manifest, nil
 }
 
-// Verify an install.yaml manifest.  Return the parsed manifest.
-// @is is the InstallSource of the install.yaml.
+// Verify an install.json manifest.  Return the parsed manifest.
+// @is is the InstallSource of the install.json.
 // @s is the storage driver, currently always an atomfs.
 func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (InstallFile, error) {
 	bytes, err := os.ReadFile(is.FilePath)
@@ -185,12 +180,12 @@ func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (Inst
 	}
 
 	var manifest InstallFile
-	err = yaml.Unmarshal(bytes, &manifest)
+	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
 		return InstallFile{}, fmt.Errorf("Failed parsing manifest: %w", err)
 	}
 
-	// We've verified the install.yaml contents.  Now verify that the container
+	// We've verified the install.json contents.  Now verify that the container
 	// image manifest files pointed to have not been altered.
 	for _, t := range manifest.Targets {
 		if is.ocirepo != nil {
@@ -235,7 +230,7 @@ func (ts InstallTargets) Validate() error {
 	return nil
 }
 
-// From a list of targets provided by the user, build an install.yaml.
+// From a list of targets provided by the user, build an install.json.
 // Most of the fields are not set here, but need to be set by the caller.
 // The function simply
 //   1. unmarshalls the input file
@@ -251,7 +246,7 @@ func ManifestFromTargets(infile string) (InstallFile, InstallTargets, error) {
 	}
 
 	manifest := InstallFile{}
-	if err := yaml.Unmarshal(bytes, &manifest); err != nil {
+	if err := json.Unmarshal(bytes, &manifest); err != nil {
 		return bad1, bad2, fmt.Errorf("Failed unmarshaling input file: %w", err)
 	}
 

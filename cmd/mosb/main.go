@@ -14,7 +14,6 @@ func main() {
 	app.Name = "mosb"
 	app.Version = Version
 	app.Commands = []cli.Command{
-		isoCmd,
 		manifestCmd,
 		sociCmd,
 	}

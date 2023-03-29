@@ -1,6 +1,7 @@
 package mosconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,7 +16,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/umoci"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 )
 
 // Only used during first install.  Create a new $config/manifest.git/
@@ -50,7 +50,7 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 		return fmt.Errorf("Failed verifying signature on %s: %w", manifestPath, err)
 	}
 
-	sFile := fmt.Sprintf("%s.yaml.signed", shaSum)
+	sFile := fmt.Sprintf("%s.json.signed", shaSum)
 	dest := filepath.Join(dir, sFile)
 	err = CopyFileBits(manifestPath+".signed", dest)
 	if err != nil {
@@ -61,7 +61,7 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 		return fmt.Errorf("Git file add for manifest signature (%q) failed: %w", sFile, err)
 	}
 
-	mFile := fmt.Sprintf("%s.yaml", shaSum)
+	mFile := fmt.Sprintf("%s.json", shaSum)
 	dest = filepath.Join(dir, mFile)
 	err = CopyFileBits(manifestPath, dest)
 	if err != nil {
@@ -83,7 +83,7 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 		return fmt.Errorf("Git file add for cert failed: %w", err)
 	}
 
-	dest = filepath.Join(dir, "manifest.yaml")
+	dest = filepath.Join(dir, "manifest.json")
 	targets := SysTargets{}
 	uidmaps := []IdmapSet{}
 
@@ -102,7 +102,7 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 		SysTargets: targets,
 	}
 
-	bytes, err := yaml.Marshal(&sysmanifest)
+	bytes, err := json.Marshal(&sysmanifest)
 	if err != nil {
 		return fmt.Errorf("Failed marshalling the system manifest")
 	}
@@ -111,7 +111,7 @@ func (mos *Mos) initManifest(manifestPath, manifestCert, manifestCA, configPath 
 	if err != nil {
 		return fmt.Errorf("Failed writing system manifest: %w", err)
 	}
-	_, err = w.Add("manifest.yaml")
+	_, err = w.Add("manifest.json")
 	if err != nil {
 		return fmt.Errorf("Git file add for system manifest failed: %w", err)
 	}
@@ -196,13 +196,13 @@ func (mos *Mos) CurrentManifest() (*SysManifest, error) {
 		return nil, fmt.Errorf("Git checkout failed: %w", err)
 	}
 
-	contents, err := os.ReadFile(filepath.Join(clonedir, "manifest.yaml"))
+	contents, err := os.ReadFile(filepath.Join(clonedir, "manifest.json"))
 	if err != nil {
 		return nil, fmt.Errorf("Error opening manifest: %w", err)
 	}
 
 	var sysmanifest SysManifest
-	err = yaml.Unmarshal(contents, &sysmanifest)
+	err = json.Unmarshal(contents, &sysmanifest)
 	if err != nil {
 		return nil, fmt.Errorf("Failed parsing manifest: %w", err)
 	}
@@ -252,7 +252,7 @@ func (mos *Mos) readInstallManifest(gitdir string, l map[string]InstallFile, yNa
 		return r, nil
 	}
 
-	pemName := strings.TrimSuffix(yName, ".yaml") + ".pem"
+	pemName := strings.TrimSuffix(yName, ".json") + ".pem"
 
 	tmpd, err := os.MkdirTemp("", "verify")
 	if err != nil {
@@ -276,7 +276,7 @@ func (mos *Mos) readInstallManifest(gitdir string, l map[string]InstallFile, yNa
 }
 
 func (mos *Mos) UpdateManifest(manifest *SysManifest, newmanifest *SysManifest, newdir string) error {
-	// Check out a new branch, copy over each required install.yaml
+	// Check out a new branch, copy over each required install.json
 	// from the old manifest, and the files from the new install.
 
 	// TODO - upon failure we should restore the old git branch
@@ -297,14 +297,14 @@ func (mos *Mos) UpdateManifest(manifest *SysManifest, newmanifest *SysManifest, 
 		return fmt.Errorf("Failed opening manifest repo: %w", err)
 	}
 
-	// Copy any needed source yamls into our tempdir
+	// Copy any needed source jsons into our tempdir
 	for _, t := range manifest.SysTargets {
 		f := t.Source
 		if PathExists(filepath.Join(newdir, f)) {
 			continue
 		}
-		base := strings.TrimSuffix(f, ".yaml")
-		for _, ext := range []string{".yaml", ".yaml.signed", ".pem"} {
+		base := strings.TrimSuffix(f, ".json")
+		for _, ext := range []string{".json", ".json.signed", ".pem"} {
 			fName := base + ext
 			src := filepath.Join(mPath, fName)
 			dest := filepath.Join(newdir, fName)
@@ -327,8 +327,8 @@ func (mos *Mos) UpdateManifest(manifest *SysManifest, newmanifest *SysManifest, 
 		if PathExists(filepath.Join(mPath, f)) {
 			continue
 		}
-		base := strings.TrimSuffix(f, ".yaml")
-		for _, ext := range []string{".yaml", ".yaml.signed", ".pem"} {
+		base := strings.TrimSuffix(f, ".json")
+		for _, ext := range []string{".json", ".json.signed", ".pem"} {
 			fName := base + ext
 			src := filepath.Join(newdir, fName)
 			dest := filepath.Join(mPath, fName)
@@ -340,13 +340,13 @@ func (mos *Mos) UpdateManifest(manifest *SysManifest, newmanifest *SysManifest, 
 			}
 		}
 	}
-	src := filepath.Join(newdir, "manifest.yaml")
-	dest := filepath.Join(mPath, "manifest.yaml")
+	src := filepath.Join(newdir, "manifest.json")
+	dest := filepath.Join(mPath, "manifest.json")
 	if err := CopyFileBits(src, dest); err != nil {
 		return fmt.Errorf("Failed copying manifest to final directory")
 	}
-	if _, err = w.Add("manifest.yaml"); err != nil {
-		return fmt.Errorf("Error adding manifest.yaml to manifest git index: %w", err)
+	if _, err = w.Add("manifest.json"); err != nil {
+		return fmt.Errorf("Error adding manifest.json to manifest git index: %w", err)
 	}
 
 	commitOpts := &git.CommitOptions{

@@ -1,12 +1,12 @@
 package mosconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 )
 
 func (mos *Mos) Update(url string) error {
@@ -34,10 +34,10 @@ func (mos *Mos) Update(url string) error {
 		return errors.Wrapf(err, "Failed verifying signature on %s", is.FilePath)
 	}
 
-	// The shasum-named install.yaml which we'll place in
+	// The shasum-named install.json which we'll place in
 	// /config/manifest.git
-	mFile := fmt.Sprintf("%s.yaml", shaSum)
-	sFile := fmt.Sprintf("%s.yaml.signed", shaSum)
+	mFile := fmt.Sprintf("%s.json", shaSum)
+	sFile := fmt.Sprintf("%s.json.signed", shaSum)
 	cFile := fmt.Sprintf("%s.pem", shaSum)
 
 	newtargets := SysTargets{}
@@ -81,12 +81,12 @@ func (mos *Mos) Update(url string) error {
 		return fmt.Errorf("Failed copying %q to %q: %w", is.CertPath, dest, err)
 	}
 
-	bytes, err := yaml.Marshal(&sysmanifest)
+	bytes, err := json.Marshal(&sysmanifest)
 	if err != nil {
 		return fmt.Errorf("Failed marshalling the system manifest")
 	}
 
-	dest = filepath.Join(tmpdir, "manifest.yaml")
+	dest = filepath.Join(tmpdir, "manifest.json")
 	if err = os.WriteFile(dest, bytes, 0640); err != nil {
 		return fmt.Errorf("Failed writing system manifest: %w", err)
 	}
