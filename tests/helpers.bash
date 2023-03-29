@@ -138,7 +138,7 @@ targets:
   - service_name: hostfs
     imagepath: ${imagepath}
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:
@@ -162,7 +162,7 @@ targets:
   - service_name: hostfs
     imagepath: ${imagepath}
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:
@@ -171,7 +171,7 @@ targets:
   - service_name: hostfstarget
     imagepath: ${imagepath}
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: fs-only
     nsgroup: ""
     network:
@@ -195,7 +195,7 @@ targets:
   - service_name: hostfs
     imagepath: ${imagepath}
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:
@@ -204,7 +204,7 @@ targets:
   - service_name: hostfstarget
     imagepath: ${imagepath}
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: container
     nsgroup: c1
     network:

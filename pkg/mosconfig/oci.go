@@ -277,7 +277,7 @@ func (soci *SOCI) Generate() error {
 		ServiceType:  HostfsService,
 		NSGroup:      "",
 		Network:      TargetNetwork{HostNetwork},
-		ManifestHash: shasum,
+		Digest:       shasum,
 	}
 	fmt.Printf("XXX shasum is %s\n", shasum)
 

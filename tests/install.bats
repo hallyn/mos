@@ -28,7 +28,7 @@ targets:
   - service_name: hostfs
     imagepath: puzzleos/hostfs
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:
@@ -57,7 +57,7 @@ targets:
   - service_name: hostfs
     imagepath: puzzleos/hostfs
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:
@@ -109,7 +109,7 @@ targets:
   - service_name: hostfs
     imagepath: puzzleos/hostfs
     version: 1.0.0
-    manifest_hash: $sum
+    digest: $sum
     service_type: hostfs
     nsgroup: ""
     network:

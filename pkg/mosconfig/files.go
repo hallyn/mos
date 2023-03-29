@@ -86,7 +86,7 @@ type Target struct {
 	Network      TargetNetwork `yaml:"network"`
 	NSGroup      string        `yaml:"nsgroup"`
 	Mounts       []*MountSpec  `yaml:"mounts"`
-	ManifestHash string        `yaml:"manifest_hash"`
+	Digest       string        `yaml:"digest"`
 }
 type InstallTargets []Target
 

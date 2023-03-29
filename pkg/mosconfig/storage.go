@@ -335,8 +335,8 @@ func (a *AtomfsStorage) VerifyTarget(t *Target) error {
 	}
 
 	realsum := blob.Descriptor.Digest.Encoded()
-	if realsum != t.ManifestHash {
-		return fmt.Errorf("Hash is %q, should be %q", realsum, t.ManifestHash)
+	if realsum != t.Digest {
+		return fmt.Errorf("Hash is %q, should be %q", realsum, t.Digest)
 	}
 
 	return nil

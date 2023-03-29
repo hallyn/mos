@@ -64,7 +64,7 @@ func (iso *ISOConfig) Generate() error {
 		if err != nil {
                         return err
                 }
-		manifest.Targets[key].ManifestHash = sum
+		manifest.Targets[key].Digest = sum
         }
 
 	manifest.Version = CurrentInstallFileVersion
