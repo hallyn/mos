@@ -11,7 +11,6 @@ like:
   targets: [
     {
       service_name: hostfs,
-      imagepath: puzzleos/hostfs,
       version: 1.0.0,
       digest: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb,
       size: 645,
@@ -19,12 +18,10 @@ like:
       nsgroup: none,
       network: {
         type: none
-      },
-      mounts: []
+      }
     },
     {
       service_name: ran,
-      imagepath: puzzleos/ran
       version: 1.0.0
       digest: sha256:1e2ba5c7c2b12368c550cd5d1bbf8265e4643b78f9d0c07008b1b7e95aeafa42,
       size: 891,
@@ -32,13 +29,7 @@ like:
       nsgroup: ran,
       network: {
         type: none
-      },
-      mounts: [
-        {
-          source: /var/ran,
-          dest: /content/ran
-        }
-      ]
+      }
     }
   ]
 }
@@ -57,7 +48,6 @@ product: de6c82c5-2e01-4c92-949b-a6545d30fc06
 update_type: complete
 targets:
   - service_name: hostfs
-    imagepath: puzzleos/hostfs
     source: docker://ubuntu:latest
     version: 1.0.0
     digest: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb  # optional
@@ -66,18 +56,13 @@ targets:
     nsgroup: none
     network:
       type: none
-    mounts: []
   - service_name: hostfs
-    imagepath: puzzleos/hostfs
     source: oci:/oci:ran:2.5
     version: 1.0.0
     service_type: hostfs
     nsgroup: ran
     network:
       type: none
-    mounts:
-     - source: /var/ran
-       dest: /content/ran
 ```
 
 The digest and size are optional here.  We highly recommend specifying
