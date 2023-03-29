@@ -78,7 +78,6 @@ func doBuildSOCI(ctx *cli.Context) error {
 
 	soci := mosconfig.SOCI{
 		Layer:       layer,
-		ImagePath:   imagepath,
 		ServiceName: targetname,
 		Version:     version,
 		Meta:        meta,

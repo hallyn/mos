@@ -86,7 +86,7 @@ func (a *AtomfsStorage) Mount(t *Target, mountpoint string) (func(), error) {
 	}
 
 	opts := atomfs.MountOCIOpts{
-		OCIDir:       filepath.Join(a.zotPath, t.ImagePath),
+		OCIDir:       filepath.Join(a.zotPath, t.ServiceName),
 		MetadataPath: a.metadataPath(),
 		Tag:          t.Version,
 		Target:       mountpoint,
@@ -284,35 +284,13 @@ func (a *AtomfsStorage) TearDownTarget(name string) error {
 	return err
 }
 
-func pickOciOrZot(inDir, inName, inVersion string) (ocidir, name string, err error) {
-	err = nil
-	if PathExists(filepath.Join(inDir, "index.json")) {
-		// simple oci layout
-		ocidir = inDir
-		name = inName
-		if inVersion != "" {
-			name = name + ":" + inVersion
-		}
-		return
-	}
-	// local zot layout
-	ocidir = filepath.Join(inDir, inName)
-	name = inVersion
-	if !PathExists(filepath.Join(ocidir, "index.json")) {
-		err = fmt.Errorf("No image %q:%q under %q", inName, inVersion, inDir)
-	}
-	return
-}
-
 func (a *AtomfsStorage) VerifyTarget(t *Target) error {
-	ocidir, name, err := pickOciOrZot(a.zotPath, t.ImagePath, t.Version)
-	if err != nil {
-		return err
-	}
+	ocidir := filepath.Join(a.zotPath, t.ServiceName)
+	name := t.Version
 
 	oci, err := umoci.OpenLayout(ocidir)
 	if err != nil {
-		return fmt.Errorf("Failed reading OCI manifest for %s: %w", t.ImagePath, err)
+		return fmt.Errorf("Failed reading OCI manifest for %s: %w", t.ServiceName, err)
 	}
 	defer oci.Close()
 
@@ -377,15 +355,15 @@ func (a *AtomfsStorage) ImportTarget(src string, target *Target) error {
 }
 
 func (a *AtomfsStorage) copyLocalZot(zotSourceDir string, target *Target) error {
-	layerDir := filepath.Join(zotSourceDir, target.ImagePath)
+	layerDir := filepath.Join(zotSourceDir, target.ServiceName)
 	src := fmt.Sprintf("oci:%s:%s", layerDir, target.Version)
-	tpath := filepath.Join(a.zotPath, target.ImagePath)
+	tpath := filepath.Join(a.zotPath, target.ServiceName)
 	if err := EnsureDir(tpath); err != nil {
 		return fmt.Errorf("Failed creating local zot directory %q: %w", tpath, err)
 	}
 	dest := fmt.Sprintf("oci:%s:%s", tpath, target.Version)
 
-	log.Infof("copying %q:%s from local zot ('%s') into zot as '%s'", target.ImagePath, target.Version, src, dest)
+	log.Infof("copying %q:%s from local zot ('%s') into zot as '%s'", target.ServiceName, target.Version, src, dest)
 
 	copyOpts := lib.ImageCopyOpts{Src: src, Dest: dest, Progress: os.Stdout}
 	if err := lib.ImageCopy(copyOpts); err != nil {
@@ -397,7 +375,7 @@ func (a *AtomfsStorage) copyLocalZot(zotSourceDir string, target *Target) error 
 
 func (a *AtomfsStorage) copyLocalOci(ociDir string, target *Target) error {
 	src := fmt.Sprintf("oci:%s:%s", ociDir, target.ServiceName)
-	tpath := filepath.Join(a.zotPath, target.ImagePath)
+	tpath := filepath.Join(a.zotPath, target.ServiceName)
 	err := EnsureDir(tpath)
 	if err != nil {
 		return fmt.Errorf("Failed creating local zot directory %q: %w", tpath, err)
@@ -415,7 +393,7 @@ func (a *AtomfsStorage) copyLocalOci(ociDir string, target *Target) error {
 }
 
 func (a *AtomfsStorage) copyRemote(image string, target *Target) error {
-	tpath := filepath.Join(a.zotPath, target.ImagePath)
+	tpath := filepath.Join(a.zotPath, target.ServiceName)
 	dest := fmt.Sprintf("oci:%s:%s", tpath, target.Version)
 	err := EnsureDir(tpath)
 	if err != nil {

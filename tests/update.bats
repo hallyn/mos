@@ -21,7 +21,6 @@ function teardown() {
   "targets": [
     {
       "service_name": "hostfs",
-      "imagepath": "puzzleos/hostfs",
       "version": "1.0.0",
       "digest": "$sum",
       "size": $size,
@@ -34,7 +33,7 @@ function teardown() {
   ]
 }
 EOF
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
@@ -44,7 +43,7 @@ EOF
 	mkdir -p $TMPD/factory/secure
 	cp ${KEYS_DIR}/manifest-ca/cert.pem $TMPD/factory/secure/manifestCA.pem
 	./mosctl install --ca-path "$TMPD/factory/secure/manifestCA.pem" -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0
-	[ -f $TMPD/atomfs-store/puzzleos/hostfs/index.json ]
+	[ -f $TMPD/atomfs-store/hostfs/index.json ]
 	sum=$(manifest_shasum busyboxu1-squashfs)
 	size=$(manifest_size busyboxu1-squashfs)
 	cat > $TMPD/install.json << EOF
@@ -55,7 +54,6 @@ EOF
   "targets": [
     {
       "service_name": "hostfs",
-      "imagepath": "puzzleos/hostfs",
       "version": "1.0.2",
       "digest": "$sum",
       "size": $size,
@@ -69,7 +67,7 @@ EOF
 }
 EOF
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.2 "$TMPD/install.json":vnd.machine.install
-	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfs:1.0.2
+	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.2
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.2 "$KEYS_DIR/manifest/cert.pem"
@@ -89,7 +87,6 @@ EOF
   "targets": [
     {
       "service_name": "hostfs",
-      "imagepath": "puzzleos/hostfs",
       "version": "1.0.0",
       "digest": "$sum",
       "size": $size,
@@ -101,7 +98,6 @@ EOF
     },
     {
       "service_name": "hostfstarget",
-      "imagepath": "puzzleos/hostfstarget",
       "version": "1.0.0",
       "digest": "$sum",
       "size": $size,
@@ -119,8 +115,8 @@ EOF
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$KEYS_DIR/manifest/cert.pem"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.signature $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json.signed"
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfs:1.0.0
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfstarget:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfstarget:1.0.0
 	# In "real life", /factory/secure/ is set up by the signed initrd
 	mkdir -p $TMPD/factory/secure
 	cp ${KEYS_DIR}/manifest-ca/cert.pem $TMPD/factory/secure/manifestCA.pem
@@ -149,7 +145,6 @@ EOF
   "targets": [
     {
       "service_name": "hostfs",
-      "imagepath": "puzzleos/hostfs",
       "version": "1.0.2",
       "digest": "$sum",
       "size": $size,
@@ -161,7 +156,6 @@ EOF
     },
     {
       "service_name": "hostfstarget",
-      "imagepath": "puzzleos/hostfstarget",
       "version": "1.0.2",
       "digest": "$sum",
       "size": $size,
@@ -175,8 +169,8 @@ EOF
 }
 EOF
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.2 "$TMPD/install.json":vnd.machine.install
-	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfs:1.0.2
-	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfstarget:1.0.2
+	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.2
+	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfstarget:1.0.2
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.2 "$KEYS_DIR/manifest/cert.pem"
@@ -216,7 +210,6 @@ EOF
   "targets": [
     {
       "service_name": "hostfs",
-      "imagepath": "puzzleos/hostfs",
       "version": "1.0.0",
       "digest": "$sum",
       "size": $size,
@@ -234,7 +227,7 @@ EOF
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$KEYS_DIR/manifest/cert.pem"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.signature $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json.signed"
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
 	mkdir -p $TMPD/factory/secure
 	cp ${KEYS_DIR}/manifest-ca/cert.pem $TMPD/factory/secure/manifestCA.pem
 	./mosctl install --ca-path "$TMPD/factory/secure/manifestCA.pem" -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0
@@ -250,7 +243,6 @@ EOF
   "targets": [
     {
       "service_name": "hostfstarget",
-      "imagepath": "puzzleos/hostfstarget",
       "version": "1.0.2",
       "digest": "$sum",
       "size": $size,
@@ -263,7 +255,7 @@ EOF
   ]
 }
 EOF
-	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/puzzleos/hostfstarget:1.0.2
+	skopeo copy --dest-tls-verify=false oci:zothub:busyboxu1-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfstarget:1.0.2
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.2 "$TMPD/install.json":vnd.machine.install
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"

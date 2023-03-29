@@ -332,7 +332,7 @@ func InitializeMos(ctx *cli.Context) error {
 	}
 
 	for _, target := range cf.Targets {
-		src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, target.ImagePath, target.Version)
+		src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, target.ServiceName, target.Version)
 		err = mos.storage.ImportTarget(src, &target)
 		if err != nil {
 			return err

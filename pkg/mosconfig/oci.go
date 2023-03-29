@@ -102,14 +102,11 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 		return errors.Wrapf(err, "Failed creating tempdir")
 	}
 
-	fmt.Printf("XXX - mounting meta layer %q %q at %q\n", repobase, metalayer, tmpd)
 	storagecache, cleanup, err := MountRepoLayer(repobase, metalayer, tmpd)
 	if err != nil {
 		return errors.Wrapf(err, "Failed unpacking SOCI metalayer layer")
 	}
 	defer cleanup()
-
-	fmt.Printf("XXX - successfully mounted the repo layer\n")
 
 	mPath := filepath.Join(tmpd, "manifest.json")
 	sPath := mPath + ".signed"
@@ -148,7 +145,7 @@ func MountSOCI(repobase, metalayer, capath, mountpoint string) error {
 	}
 	t := manifest.Targets[0]
 
-	name := t.ImagePath
+	name := t.ServiceName
 	if t.Version != "" {
 		name = name + ":" + t.Version
 	}
@@ -172,9 +169,6 @@ type SOCI struct {
 	// base image name of Layer
 	ServiceName string
 
-	// Path under which the layer is found on the host
-	ImagePath string
-
 	// Version to call the service.
 	Version string
 
@@ -191,56 +185,56 @@ type SOCI struct {
 }
 
 // Open an OCI image manifest.  Return the ispec.Manifest descriptor as
-// well as the shasum.
-func openManifest(url string) (ispec.Manifest, string, error) {
+// well as the shasum and size.
+func openManifest(url string) (ispec.Manifest, string, int64, error) {
 	emptyM := ispec.Manifest{}
 	src, err := imagesource.NewImageSource(url)
 	if err != nil {
-		return emptyM, "", err
+		return emptyM, "", 0, err
 	}
 	if src.Type == imagesource.DockerLayer {
-		return emptyM, "", fmt.Errorf("docker:// urls not yet supported")
+		return emptyM, "", 0, fmt.Errorf("docker:// urls not yet supported")
 	}
 
 	r := strings.SplitN(src.Url, ":", 2)
 	if len(r) != 2 {
-		return emptyM, "", fmt.Errorf("Invalid image url")
+		return emptyM, "", 0, fmt.Errorf("Invalid image url")
 	}
 	ociDir := r[0]
 	imageName := r[1]
 	oci, err := umoci.OpenLayout(ociDir)
 	if err != nil {
-		return emptyM, "", err
+		return emptyM, "", 0, err
 	}
 	defer oci.Close()
 
 	ociManifest, err := stackeroci.LookupManifest(oci, imageName)
 	if err != nil {
-		return emptyM, "", err
+		return emptyM, "", 0, err
 	}
 
 	descriptorPaths, err := oci.ResolveReference(context.Background(), imageName)
 	if err != nil {
-		return emptyM, "", err
+		return emptyM, "", 0, err
 	}
 
 	if len(descriptorPaths) != 1 {
-		return emptyM, "", fmt.Errorf("bad descriptor %q in %q", imageName, ociDir)
+		return emptyM, "", 0, fmt.Errorf("bad descriptor %q in %q", imageName, ociDir)
 	}
 
 	blob, err := oci.FromDescriptor(context.Background(), descriptorPaths[0].Descriptor())
 	if err != nil {
-		return emptyM, "", err
+		return emptyM, "", 0, err
 	}
 	defer blob.Close()
 
 	if blob.Descriptor.MediaType != ispec.MediaTypeImageManifest {
-		return emptyM, "", fmt.Errorf("descriptor does not point to a manifest: %s", blob.Descriptor.MediaType)
+		return emptyM, "", 0, fmt.Errorf("descriptor does not point to a manifest: %s", blob.Descriptor.MediaType)
 	}
 
 	shasum := blob.Descriptor.Digest.Encoded()
 
-	return ociManifest, shasum, nil
+	return ociManifest, shasum, blob.Descriptor.Size, nil
 }
 
 // Make an SOCI layer
@@ -265,21 +259,20 @@ func (soci *SOCI) Generate() error {
 		return fmt.Errorf("Unknown image url: %q", soci.Layer)
 	}
 
-	_, shasum, err := openManifest(soci.Layer)
+	_, shasum, size, err := openManifest(soci.Layer)
 	if err != nil {
 		return fmt.Errorf("Failed opening oci layer %q: %w", soci.Layer, err)
 	}
 
 	t := Target{
 		ServiceName:  soci.ServiceName,
-		ImagePath:    soci.ImagePath,
 		Version:      soci.Version,
 		ServiceType:  HostfsService,
 		NSGroup:      "",
 		Network:      TargetNetwork{HostNetwork},
 		Digest:       shasum,
+		Size:         size,
 	}
-	fmt.Printf("XXX shasum is %s\n", shasum)
 
 	target := InstallTargets{t}
 	manifest := InstallFile{

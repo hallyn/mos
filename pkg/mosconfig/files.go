@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 	ispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/project-machine/trust/pkg/trust"
-	imagesource "stackerbuild.io/stacker/pkg/types"
 )
 
 // An ImageType can be either an ISO or a Zap layer.
@@ -75,7 +73,6 @@ const (
 
 type Target struct {
 	ServiceName  string        `json:"service_name"` // name of target
-	ImagePath    string        `json:"imagepath"`    // full image repository path
 	Version      string        `json:"version"`      // docker or oci version tag
 	ServiceType  ServiceType   `json:"service_type"`
 	Network      TargetNetwork `json:"network"`
@@ -194,7 +191,7 @@ func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (Inst
 			// This is not terribly important as nothing will use it,
 			// unless there's a manifest which is properly signed which refers
 			// to it, in which case we'll regret having deleted it...
-			src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, t.ImagePath, t.Version)
+			src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, t.ServiceName, t.Version)
 			if err := s.ImportTarget(src, &t); err != nil {
 				return InstallFile{}, err
 			}
@@ -228,69 +225,4 @@ func (ts InstallTargets) Validate() error {
 	}
 
 	return nil
-}
-
-// From a list of targets provided by the user, build an install.json.
-// Most of the fields are not set here, but need to be set by the caller.
-// The function simply
-//   1. unmarshalls the input file
-//   2. replace the ImagePath from one which is used to import to one one which
-//      will be used on the host.
-func ManifestFromTargets(infile string) (InstallFile, InstallTargets, error) {
-	bad1 := InstallFile{}
-	bad2 := InstallTargets{}
-
-	bytes, err := os.ReadFile(infile)
-	if err != nil {
-		return bad1, bad2, fmt.Errorf("Failed reading %q: %w", infile, err)
-	}
-
-	manifest := InstallFile{}
-	if err := json.Unmarshal(bytes, &manifest); err != nil {
-		return bad1, bad2, fmt.Errorf("Failed unmarshaling input file: %w", err)
-	}
-
-	inTargets := InstallTargets{}
-	for key, t := range manifest.Targets {
-		inTargets = append(inTargets, t)
-		b, err := calculateImagePath(t.ImagePath)
-		if err != nil {
-			return bad1, bad2, fmt.Errorf("Failed parsing image path %q: %w", t.ImagePath, err)
-		}
-		manifest.Targets[key].ImagePath = b
-	}
-
-	return manifest, inTargets, nil
-}
-
-func calculateImagePath(url string) (string, error) {
-	src, err := imagesource.NewImageSource(url)
-	if err != nil {
-		return "", err
-	}
-
-	// For oci:oci:image:version, src.Url will be oci:image:version, and we
-	// want to return 'image'.
-	// For docker://zothub.io/machine/baseos:1.0.2 src.Url will be
-	// zothub.io/machine/baseos:1.0.2, and we want to return machine/baseos
-
-	switch src.Type {
-	case "oci":
-		tag, err := src.ParseTag()
-		if err != nil {
-			return "", err
-		}
-		r := strings.SplitN(tag, ":", 2)
-		return r[0], nil
-	case "docker":
-		du, err := imagesource.NewDockerishUrl(url)
-		if err != nil {
-			return "", err
-		}
-		tag := strings.TrimPrefix(du.Path, "/")
-		r := strings.SplitN(tag, ":", 2)
-		return r[0], nil
-	default:
-		return "", fmt.Errorf("Unhandled image type %s", src.Type)
-	}
 }
