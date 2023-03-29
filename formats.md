@@ -13,7 +13,8 @@ like:
       service_name: hostfs,
       imagepath: puzzleos/hostfs,
       version: 1.0.0,
-      manifest_hash: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb,
+      digest: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb,
+      size: 645,
       service_type: hostfs,
       nsgroup: none,
       network: {
@@ -22,11 +23,12 @@ like:
       mounts: []
     },
     {
-      service_name: hostfs,
-      imagepath: puzzleos/hostfs
+      service_name: ran,
+      imagepath: puzzleos/ran
       version: 1.0.0
-      manifest_hash: sha256:1e2ba5c7c2b12368c550cd5d1bbf8265e4643b78f9d0c07008b1b7e95aeafa42,
-      service_type: hostfs,
+      digest: sha256:1e2ba5c7c2b12368c550cd5d1bbf8265e4643b78f9d0c07008b1b7e95aeafa42,
+      size: 891,
+      service_type: container,
       nsgroup: ran,
       network: {
         type: none
@@ -58,7 +60,8 @@ targets:
     imagepath: puzzleos/hostfs
     source: docker://ubuntu:latest
     version: 1.0.0
-    manifest_hash: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb  # optional
+    digest: sha256:53fb9924c10ff56f1ae1306e7c70272ea6bdad44ea68ab341ead5ba1f42f51fb  # optional
+    size: 645
     service_type: hostfs
     nsgroup: none
     network:
@@ -77,13 +80,13 @@ targets:
        dest: /content/ran
 ```
 
-The manifest_hash is optional here.  We highly recommend specifying
-it when possible, however you can also use cosign to provide the
-security guarantees you need.  To accomodate that, if manifest_hash
+The digest and size are optional here.  We highly recommend specifying
+them when possible, however you can also use cosign to provide the
+security guarantees you need.  To accomodate that, if digest
 is not provided, then mosb will fill it in in the resulting install.json.
 
 (Note: we are not (yet) enforcing that you cosign-verify each image
-that does not have a manifest_hash listed here.)
+that does not have a digest listed here.)
 
 To convert, sign and publish the install manifest, you would run:
 
