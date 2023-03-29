@@ -42,7 +42,7 @@ function teardown() {
 }
 EOF
 
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
 	echo "fooled ya" > "$TMPD/install.json.signed"
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$KEYS_DIR/manifest/cert.pem"
@@ -77,7 +77,7 @@ EOF
 }
 EOF
 
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
@@ -85,7 +85,7 @@ EOF
 	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.signature $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json.signed"
 	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/manifestCA.pem"
 	./mosctl install --ca-path "$TMPD/manifestCA.pem" -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0
-	[ -f $TMPD/atomfs-store/hostfs/index.json ]
+	[ -f $TMPD/atomfs-store/mos/index.json ]
 }
 
 @test "mos install with bad version" {
@@ -99,7 +99,7 @@ EOF
   "targets": []
 }
 EOF
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"
@@ -114,6 +114,7 @@ EOF
 
 @test "simple mos install with bad manifest hash" {
 	sum=$(manifest_shasum busybox-squashfs)
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
 	size=$(manifest_size busybox-squashfs)
 	# Next line is where we make the manifest hash invalid
 	sum=$(echo $sum | sha256sum | cut -f 1 -d \ )
@@ -137,7 +138,6 @@ EOF
   ]
 }
 EOF
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/hostfs:1.0.0
 	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
 		-out "$TMPD/install.json.signed" "$TMPD/install.json"

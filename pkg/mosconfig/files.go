@@ -191,7 +191,7 @@ func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (Inst
 			// This is not terribly important as nothing will use it,
 			// unless there's a manifest which is properly signed which refers
 			// to it, in which case we'll regret having deleted it...
-			src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, t.ServiceName, t.Version)
+			src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, t.Digest)
 			if err := s.ImportTarget(src, &t); err != nil {
 				return InstallFile{}, err
 			}

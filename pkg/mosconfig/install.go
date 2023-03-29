@@ -332,10 +332,10 @@ func InitializeMos(ctx *cli.Context) error {
 	}
 
 	for _, target := range cf.Targets {
-		src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, target.ServiceName, target.Version)
+		src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, target.Digest)
 		err = mos.storage.ImportTarget(src, &target)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Failed reading targets while initializing mos")
 		}
 	}
 
@@ -370,10 +370,11 @@ func PublishManifest(ctx *cli.Context) error {
 	if cert == "" {
 		return fmt.Errorf("Repo is required")
 	}
-	infile := ctx.String("file")
-	if infile == "" {
-		return fmt.Errorf("file is required")
+	args := ctx.Args()
+	if len(args) != 1 {
+		return fmt.Errorf("file is a required positional argument")
 	}
+	infile := args[0]
 	fmt.Printf("Would install using: %s %s %s %s %s", cert, key, repo, destpath, infile)
 
 	// TODO not implemented

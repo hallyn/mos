@@ -49,7 +49,7 @@ func (mos *Mos) Update(url string) error {
 			raw:    &t,
 		}
 		newtargets = append(newtargets, newT)
-		src := fmt.Sprintf("docker://%s/%s:%s", is.ocirepo.addr, t.ServiceName, t.Version)
+		src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, t.Digest)
 		if err := mos.storage.ImportTarget(src, &t); err != nil {
 			return fmt.Errorf("Failed copying %s: %w", newT.Name, err)
 		}
