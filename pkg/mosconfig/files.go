@@ -10,14 +10,6 @@ import (
 	"github.com/project-machine/trust/pkg/trust"
 )
 
-// An ImageType can be either an ISO or a Zap layer.
-type ImageType string
-
-const (
-	ISO ImageType = "iso"
-	ZAP ImageType = "zap"
-)
-
 // Update can be full, meaning all existing Targets are replaced, or
 // partial, meaning those in the install manifest are installed or
 // replaced, but any other Targets on the system remain.
@@ -50,6 +42,7 @@ func ParseUpdateType(t string) (UpdateType, error) {
 
 const CurrentInstallFileVersion = 1
 
+// Service networking.
 // Only host network supported right now.
 // To do: simple/nat, CNI
 type TargetNetworkType string
@@ -63,6 +56,11 @@ type TargetNetwork struct {
 	Type TargetNetworkType `json:"type"`
 }
 
+// Service type defines how a service is run.
+// Hostfs is the "root filesystem".
+// Container services run in lxc containers.
+// FsService (fs-only) only offers a filesystem that can
+// be mounted for user by others.
 type ServiceType string
 
 const (
@@ -71,6 +69,11 @@ const (
 	FsService        ServiceType = "fs-only"
 )
 
+// Target defines a single service.  This includes the rootfs
+// and every container and fs-only service.
+// NSGroup is a user namespace group.  Two services both in
+// NSGroup 'ran' will have the same uid mapping.  A service
+// in NSGroup "none" (or "") runs in the host uid network.
 type Target struct {
 	ServiceName  string        `json:"service_name"` // name of target
 	Version      string        `json:"version"`      // docker or oci version tag
@@ -89,11 +92,9 @@ func (t *Target) NeedsIdmap() bool {
 // This describes an install manifest
 type InstallFile struct {
 	Version     int            `json:"version"`
-	ImageType   ImageType      `json:"image_type"`
 	Product     string         `json:"product"`
 	Targets     InstallTargets `json:"targets"`
 	UpdateType  UpdateType     `json:"update_type"`
-	StorageType StorageType    `json:"storage_type"`
 }
 
 // Note we only do combined uid+gid ranges, range 65536, and only starting at
@@ -191,7 +192,7 @@ func ReadVerifyInstallManifest(is InstallSource, capath string, s Storage) (Inst
 			// This is not terribly important as nothing will use it,
 			// unless there's a manifest which is properly signed which refers
 			// to it, in which case we'll regret having deleted it...
-			src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, t.Digest)
+			src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, dropHashAlg(t.Digest))
 			if err := s.ImportTarget(src, &t); err != nil {
 				return InstallFile{}, err
 			}
@@ -226,3 +227,25 @@ func (ts InstallTargets) Validate() error {
 
 	return nil
 }
+
+// The import manifest (manifest.yaml) which the user writes,
+// and which mosb converts into an install.json.
+
+type ImportFile struct {
+	Version     int            `yaml:"version"`
+	Product     string         `yaml:"product"`
+	Targets     UserTargets  `yaml:"targets"`
+	UpdateType  UpdateType     `yaml:"update_type"`
+}
+
+type UserTarget struct {
+	ServiceName  string        `yaml:"service_name"` // name of target
+	Source       string        `yaml:"source"`       // docker url from which to fetch
+	Version      string        `yaml:"version"`      // A version for internal use.
+	ServiceType  ServiceType   `yaml:"service_type"`
+	Network      TargetNetwork `yaml:"network"`
+	NSGroup      string        `yaml:"nsgroup"`
+	Digest       string        `yaml:"digest"`
+	Size         int64         `yaml:"size"`
+}
+type UserTargets []UserTarget

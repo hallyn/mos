@@ -22,7 +22,7 @@ function teardown() {
     {
       "service_name": "hostfs",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -55,7 +55,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.2",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -88,7 +88,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -99,7 +99,7 @@ EOF
     {
       "service_name": "hostfstarget",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "fs-only",
       "nsgroup": "",
@@ -145,7 +145,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.2",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -156,7 +156,7 @@ EOF
     {
       "service_name": "hostfstarget",
       "version": "1.0.2",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "fs-only",
       "nsgroup": "",
@@ -209,7 +209,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -242,7 +242,7 @@ EOF
     {
       "service_name": "hostfstarget",
       "version": "1.0.2",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "fs-only",
       "nsgroup": "",

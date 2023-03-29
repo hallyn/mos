@@ -29,7 +29,7 @@ var manifestCmd = cli.Command{
 					Usage: "address:port for the OCI repository to write to, e.g. 10.0.2.2:5000",
 				},
 				cli.StringFlag{
-					Name:  "dest-path",
+					Name:  "name",
 					Usage: "path on OCI repository to write the processed manifest (install.json) to, e.g. puzzleos/hostfs:1.0.1",
 				},
 				cli.StringFlag{

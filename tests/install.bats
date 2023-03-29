@@ -10,49 +10,6 @@ function teardown() {
   common_teardown
 }
 
-@test "simple mos install from local oci" {
-	skip # good_install uses mosb install which is not yet converted
-	good_install hostfsonly
-	cat $TMPD/install.json
-	[ -f $TMPD/atomfs-store/busybox-squashfs/index.json ]
-	[ -f $TMPD/config/manifest.git/manifest.json ]
-}
-
-@test "simple mos install with bad signature" {
-	sum=$(manifest_shasum busybox-squashfs)
-	size=$(manifest_size busybox-squashfs)
-	cat > $TMPD/install.json << EOF
-{
-  "version": 1,
-  "product": "de6c82c5-2e01-4c92-949b-a6545d30fc06",
-  "update_type": "complete",
-  "targets": [
-    {
-      "service_name": "hostfs",
-      "version": "1.0.0",
-      "digest": "$sum",
-      "size": $size,
-      "service_type": "hostfs",
-      "nsgroup": "",
-      "network": {
-        "type": "host"
-      }
-    }
-  ]
-}
-EOF
-
-	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
-	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
-	echo "fooled ya" > "$TMPD/install.json.signed"
-	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$KEYS_DIR/manifest/cert.pem"
-	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.signature $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json.signed"
-	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/manifestCA.pem"
-	failed=0
-	./mosctl install -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 || failed=1
-	[ $failed -eq 1 ]
-}
-
 @test "simple mos install from local zot" {
 	sum=$(manifest_shasum busybox-squashfs)
 	size=$(manifest_size busybox-squashfs)
@@ -65,7 +22,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "",
@@ -86,6 +43,48 @@ EOF
 	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/manifestCA.pem"
 	./mosctl install --ca-path "$TMPD/manifestCA.pem" -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0
 	[ -f $TMPD/atomfs-store/mos/index.json ]
+}
+
+@test "simple mos manifest publish and mos install" {
+	good_install hostfsonly
+	cat $TMPD/install.json
+	[ -f $TMPD/atomfs-store/busybox-squashfs/index.json ]
+	[ -f $TMPD/config/manifest.git/manifest.json ]
+}
+
+@test "simple mos install with bad signature" {
+	sum=$(manifest_shasum busybox-squashfs)
+	size=$(manifest_size busybox-squashfs)
+	cat > $TMPD/install.json << EOF
+{
+  "version": 1,
+  "product": "de6c82c5-2e01-4c92-949b-a6545d30fc06",
+  "update_type": "complete",
+  "targets": [
+    {
+      "service_name": "hostfs",
+      "version": "1.0.0",
+      "digest": "sha256:$sum",
+      "size": $size,
+      "service_type": "hostfs",
+      "nsgroup": "",
+      "network": {
+        "type": "host"
+      }
+    }
+  ]
+}
+EOF
+
+	skopeo copy --dest-tls-verify=false oci:zothub:busybox-squashfs docker://$ZOT_HOST:$ZOT_PORT/mos:$sum
+	oras push --plain-http --image-spec v1.1-image $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json":vnd.machine.install
+	echo "fooled ya" > "$TMPD/install.json.signed"
+	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.pubkeycrt $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$KEYS_DIR/manifest/cert.pem"
+	oras attach --plain-http --image-spec v1.1-image --artifact-type vnd.machine.signature $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 "$TMPD/install.json.signed"
+	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/manifestCA.pem"
+	failed=0
+	./mosctl install -c $TMPD/config -a $TMPD/atomfs-store $ZOT_HOST:$ZOT_PORT/machine/install:1.0.0 || failed=1
+	[ $failed -eq 1 ]
 }
 
 @test "mos install with bad version" {
@@ -127,7 +126,7 @@ EOF
     {
       "service_name": "hostfs",
       "version": "1.0.0",
-      "digest": "$sum",
+      "digest": "sha256:$sum",
       "size": $size,
       "service_type": "hostfs",
       "nsgroup": "none",

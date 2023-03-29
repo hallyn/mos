@@ -277,11 +277,9 @@ func (soci *SOCI) Generate() error {
 	target := InstallTargets{t}
 	manifest := InstallFile{
 		Version:     1,
-		ImageType:   ISO,
 		UpdateType:  FullUpdate,
 		Product:     "de6c82c5-2e01-4c92-949b-a6545d30fc06", // FIXME get this from cert?
 		Targets:     target,
-		StorageType: AtomfsStorageType,
 	}
 
 	// write the manifest

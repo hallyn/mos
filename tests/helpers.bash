@@ -132,96 +132,81 @@ function manifest_size {
 }
 
 function write_install_yaml {
-	pathtype=$1
-	spectype=$2
+	spectype=$1
+	sum=$(manifest_shasum busybox-squashfs)
+	size=$(manifest_size busybox-squashfs)
 	case "$spectype" in
 	  hostfsonly)
-	    sum=$(manifest_shasum busybox-squashfs)
-	    if [ "$pathtype" = "ocipath" ]; then
-	      imagepath=oci:zothub:busybox-squashfs
-	    else
-	      imagepath=puzzleos/hostfs
-	    fi
-	    cat > $TMPD/install.yaml << EOF
+	    cat > $TMPD/manifest.yaml << EOF
 version: 1
 product: de6c82c5-2e01-4c92-949b-a6545d30fc06
 update_type: complete
 targets:
   - service_name: hostfs
-    imagepath: ${imagepath}
+    source: oci:zothub:busybox-squashfs
     version: 1.0.0
-    digest: $sum
+    digest: sha256:$sum
+    size: $size
     service_type: hostfs
     nsgroup: ""
     network:
       type: none
-    mounts: []
 EOF
 	  ;;
 
 	  fsonly)
 	    sum=$(manifest_shasum busybox-squashfs)
-	    if [ "$pathtype" = "ocipath" ]; then
-	      imagepath=oci:zothub:busybox-squashfs
-	    else
-	      imagepath=puzzleos/hostfs
-	    fi
-	    cat > $TMPD/install.yaml << EOF
+	    cat > $TMPD/manifest.yaml << EOF
 version: 1
 product: de6c82c5-2e01-4c92-949b-a6545d30fc06
 update_type: complete
 targets:
   - service_name: hostfs
-    imagepath: ${imagepath}
+    source: oci:zothub:busybox-squashfs
     version: 1.0.0
-    digest: $sum
+    digest: sha256:$sum
+    size: $size
     service_type: hostfs
     nsgroup: ""
     network:
       type: host
-    mounts: []
   - service_name: hostfstarget
-    imagepath: ${imagepath}
+    source: oci:zothub:busybox-squashfs
     version: 1.0.0
-    digest: $sum
+    digest: sha256:$sum
+    size: $size
     service_type: fs-only
     nsgroup: ""
     network:
       type: none
-    mounts: []
 EOF
 	    ;;
 
 	  containeronly)
 	    sum=$(manifest_shasum busybox-squashfs)
-	    if [ "$pathtype" = "ocipath" ]; then
-	      imagepath=oci:zothub:busybox-squashfs
-	    else
-	      imagepath=puzzleos/hostfs
-	    fi
-	    cat > $TMPD/install.yaml << EOF
+	    cat > $TMPD/manifest.yaml << EOF
 version: 1
 product: de6c82c5-2e01-4c92-949b-a6545d30fc06
 update_type: complete
 targets:
   - service_name: hostfs
-    imagepath: ${imagepath}
+    source: oci:zothub:busybox-squashfs
     version: 1.0.0
-    digest: $sum
+    digest: sha256:$sum
+    size: $size
     service_type: hostfs
     nsgroup: ""
     network:
       type: host
-    mounts: []
   - service_name: hostfstarget
-    imagepath: ${imagepath}
+    source: oci:zothub:busybox-squashfs
     version: 1.0.0
-    digest: $sum
+    digest: sha256:$sum
+    size: $size
     service_type: container
     nsgroup: c1
     network:
       type: host
-    mounts: []
 EOF
 	    ;;
 	  *)
@@ -233,24 +218,24 @@ EOF
 
 function good_install {
 	spectype=$1
-	write_install_yaml ocipath "$spectype"
-	./mosb iso build --key "${KEYS_DIR}/manifest/privkey.pem" \
+	write_install_yaml "$spectype"
+	./mosb manifest publish --key "${KEYS_DIR}/manifest/privkey.pem" \
 		--cert "${KEYS_DIR}/manifest-ca/cert.pem" \
-		--file $TMPD/install.yaml \
-		--output-file $TMPD/mos.iso
-	rm $TMPD/install.yaml
-	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/manifestCA.pem"
-	# Just expand the iso in $TMPD
-	(pushd $TMPD; bsdtar -x -f mos.iso; rm -f mos.iso; popd)
-	./mosctl --debug install -c $TMPD/config -a $TMPD/atomfs-store -f $TMPD/install.yaml
+		--repo ${ZOT_HOST}:${ZOT_PORT} --name puzzleos/install:1.0.0 \
+		$TMPD/manifest.yaml
+	rm $TMPD/manifest.yaml
+	mkdir -p $TMPD/factory/secure
+	cp "${KEYS_DIR}/manifest-ca/cert.pem" "$TMPD/factory/secure/manifestCA.pem"
+	./mosctl --debug install -c $TMPD/config -a $TMPD/atomfs-store \
+	    ${ZOT_HOST}:${ZOT_PORT}/puzzleos/install:1.0.0
 }
 
 function lxc_install {
 	# set up the file we need under TMPD
 	spectype=$1
-	write_install_yaml zotpath "$spectype"
+	write_install_yaml "$spectype"
 	openssl dgst -sha256 -sign "${KEYS_DIR}/manifest/privkey.pem" \
-		-out "$TMPD/install.yaml.signed" "$TMPD/install.yaml"
+		-out "$TMPD/install.yaml.signed" "$TMPD/manifest.yaml"
 	skopeo copy oci:zothub:busybox-squashfs oci:$TMPD/oci:hostfs
 	skopeo copy oci:zothub:busybox-squashfs oci:$TMPD/oci:hostfstarget
 	cp mosctl ${TMPD}/

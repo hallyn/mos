@@ -1,23 +1,29 @@
 package mosconfig
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/opencontainers/umoci"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	ispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"gopkg.in/yaml.v2"
+	"stackerbuild.io/stacker/pkg/lib"
 )
 
 type ociurl struct {
 	name    string // the oci name (<name> in distribution spec)- e.g. foo/image
 	tag     string // the oci tag, e.g. 1.0.0
 	mDigest string // the digest for this image's manifest
+	mSize   int64
 	fDigest string // the digest for this file's contents - the actual blob digest
 }
 
@@ -52,6 +58,8 @@ func (r *ocirepo) pickUrl(base string) (ociurl, error) {
 	if url.mDigest == "" {
 		return url, errors.Errorf("No Docker-Content-Digest received")
 	}
+	strSize := resp.Header.Get("Content-Length")
+	url.mSize, err = strconv.ParseInt(strSize, 10, 64)
 
 	// Read the actual ispec.Index and get the Digest for Layer 1 - that
 	// is the actual digest of the blob we want
@@ -332,7 +340,7 @@ func InitializeMos(ctx *cli.Context) error {
 	}
 
 	for _, target := range cf.Targets {
-		src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, target.Digest)
+		src := fmt.Sprintf("docker://%s/mos:%s", is.ocirepo.addr, dropHashAlg(target.Digest))
 		err = mos.storage.ImportTarget(src, &target)
 		if err != nil {
 			return errors.Wrapf(err, "Failed reading targets while initializing mos")
@@ -375,8 +383,129 @@ func PublishManifest(ctx *cli.Context) error {
 		return fmt.Errorf("file is a required positional argument")
 	}
 	infile := args[0]
-	fmt.Printf("Would install using: %s %s %s %s %s", cert, key, repo, destpath, infile)
 
+	bytes, err := os.ReadFile(infile)
+	if err != nil {
+		return errors.Wrapf(err, "Error reading %s", infile)
+	}
+
+	var imports ImportFile
+	err = yaml.Unmarshal(bytes, &imports)
+	if err != nil {
+		return errors.Wrapf(err, "Error parsing %s", infile)
+	}
+
+	if imports.Version != CurrentInstallFileVersion {
+		return errors.Errorf("Unknown import file version: %d (I know about %d)", imports.Version, CurrentInstallFileVersion)
+	}
+
+	install := InstallFile{
+		Version: imports.Version,
+		Product: imports.Product,
+		UpdateType: imports.UpdateType,
+	}
+
+	// Copy each of the targets to specified oci repo,
+	// verify digest and size, and append them to the install
+	// manifest's list.
+	for _, t := range imports.Targets {
+		digest, size, err := getSizeDigest(t.Source)
+		if err != nil {
+			return errors.Wrapf(err, "Failed checking %s", t.Source)
+		}
+		if t.Digest != digest {
+			return errors.Errorf("Digest (%s) specified for %s does not match remote image's (%s)", t.Digest, t.Source, digest)
+		}
+		if t.Size != size {
+			return errors.Errorf("Size (%d) specified for %s does not match remote image's (%s)", t.Size, t.Source, size)
+		}
+
+		dest := "docker://" + repo + "/mos:" + dropHashAlg(digest)
+		copyOpts := lib.ImageCopyOpts{Src: t.Source,
+			Dest:       dest,
+			Progress:   os.Stdout,
+			SrcSkipTLS: true,
+		}
+		if err := lib.ImageCopy(copyOpts); err != nil {
+			return errors.Wrapf(err, "Failed copying %s to %s", t.Source, dest)
+		}
+		install.Targets = append(install.Targets, Target{
+			ServiceName: t.ServiceName,
+			Version:     t.Version,
+			ServiceType: t.ServiceType,
+			Network:     t.Network,
+			NSGroup:     t.NSGroup,
+			Digest:      digest,
+			Size:        size},
+		)
+	}
+
+	dest := repo + "/" + destpath
+	if err = PostManifest(install, dest); err != nil {
+		return errors.Wrapf(err, "Failed writing install.json to %s", dest)
+	}
+
+	return nil
+}
+
+func getSizeDigestOCI(inUrl string) (string, int64, error) {
+	split := strings.SplitN(inUrl, ":", 3)
+	if len(split) != 3 {
+		return "", 0, errors.Errorf("Bad oci url: %s", inUrl)
+	}
+	ocidir := split[1]
+	image := split[2]
+	oci, err := umoci.OpenLayout(ocidir)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Failed opening oci layout at %q", ocidir)
+	}
+	dp, err := oci.ResolveReference(context.Background(), image)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Failed looking up image %q", image)
+	}
+	if len(dp) != 1 {
+		return "", 0, errors.Errorf("bad descriptor tag %q", image)
+	}
+	blob, err := oci.FromDescriptor(context.Background(), dp[0].Descriptor())
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Error finding image")
+	}
+	defer blob.Close()
+	desc := blob.Descriptor
+	return desc.Digest.String(), desc.Size, nil
+}
+
+func getSizeDigestDist(inUrl string) (string, int64, error) {
+	// http://127.0.0.1:18080/v2/os/busybox-squashfs/manifests/1.0
+	r, err := NewOciRepo(inUrl)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Failed to find source repo info for %q", inUrl)
+	}
+
+	u, err := r.pickUrl(inUrl)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Error parsing install manifest inUrl %q", inUrl)
+	}
+
+	return u.mDigest, u.mSize, nil
+}
+
+func getSizeDigest(inUrl string) (string, int64, error) {
+	if strings.HasPrefix(inUrl, "oci:") {
+		return getSizeDigestOCI(inUrl)
+	}
+	return getSizeDigestDist(inUrl)
+}
+
+func PostManifest(manifest InstallFile, dest string) error {
 	// TODO not implemented
 	return nil
+}
+
+func dropHashAlg(d string) string {
+	s := strings.SplitN(d, ":", 2)
+	if len(s) == 2 {
+		return s[1]
+	}
+	return d
 }
