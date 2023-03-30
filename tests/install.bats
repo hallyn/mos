@@ -16,7 +16,8 @@ function teardown() {
 		--cert "${KEYS_DIR}/manifest-ca/cert.pem" \
 		--repo ${ZOT_HOST}:${ZOT_PORT} --name puzzleos/install:1.0.0 \
 		$TMPD/manifest.yaml
-	[ -f $TMPD/zot/puzzleos/install/index.json ]
+	[ -f $TMPD/zot/mos/index.json ]  # the layers were pushed
+	[ -f $TMPD/zot/puzzleos/install/index.json ]  # the manifest was pushed
 }
 
 @test "simple mos install from local zot" {

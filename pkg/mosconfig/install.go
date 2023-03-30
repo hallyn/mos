@@ -449,17 +449,14 @@ func PublishManifest(ctx *cli.Context) error {
 	}
 	defer os.RemoveAll(workdir)
 
-	filePath := filepath.Join(workdir, "install.json")
-	f, err := os.OpenFile(filePath, os.O_CREATE, 0644)
+	bytes, err = json.Marshal(&install)
 	if err != nil {
-		return errors.Wrapf(err, "Failed opening %s for writing", filePath)
-	}
-	err = json.NewEncoder(f).Encode(install)
-	if err != nil {
-		f.Close()
 		return errors.Wrapf(err, "Failed encoding the install.json")
 	}
-	f.Close()
+	filePath := filepath.Join(workdir, "install.json")
+	if err := os.WriteFile(filePath, bytes, 0644); err != nil {
+		return errors.Wrapf(err, "Failed opening %s for writing", filePath)
+	}
 	signPath := filepath.Join(workdir, "install.json.signed")
 	if err = trust.Sign(filePath, signPath, key); err != nil {
 		return errors.Wrapf(err, "Failed signing file")
