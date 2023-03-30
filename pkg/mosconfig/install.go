@@ -13,6 +13,7 @@ import (
 
 	"github.com/opencontainers/umoci"
 	"github.com/pkg/errors"
+	"github.com/project-machine/trust/pkg/trust"
 	"github.com/urfave/cli"
 	ispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v2"
@@ -421,10 +422,12 @@ func PublishManifest(ctx *cli.Context) error {
 		}
 
 		dest := "docker://" + repo + "/mos:" + dropHashAlg(digest)
-		copyOpts := lib.ImageCopyOpts{Src: t.Source,
-			Dest:       dest,
-			Progress:   os.Stdout,
-			SrcSkipTLS: true,
+		copyOpts := lib.ImageCopyOpts{
+			Src: t.Source,
+			Dest:        dest,
+			Progress:    os.Stdout,
+			SrcSkipTLS:  true,
+			DestSkipTLS: true,
 		}
 		if err := lib.ImageCopy(copyOpts); err != nil {
 			return errors.Wrapf(err, "Failed copying %s to %s", t.Source, dest)
@@ -440,8 +443,30 @@ func PublishManifest(ctx *cli.Context) error {
 		)
 	}
 
+	workdir, err := os.MkdirTemp("", "manifest")
+	if err != nil {
+		return errors.Wrapf(err, "Failed creating tempdir")
+	}
+	defer os.RemoveAll(workdir)
+
+	filePath := filepath.Join(workdir, "install.json")
+	f, err := os.OpenFile(filePath, os.O_CREATE, 0644)
+	if err != nil {
+		return errors.Wrapf(err, "Failed opening %s for writing", filePath)
+	}
+	err = json.NewEncoder(f).Encode(install)
+	if err != nil {
+		f.Close()
+		return errors.Wrapf(err, "Failed encoding the install.json")
+	}
+	f.Close()
+	signPath := filepath.Join(workdir, "install.json.signed")
+	if err = trust.Sign(filePath, signPath, key); err != nil {
+		return errors.Wrapf(err, "Failed signing file")
+	}
+
 	dest := repo + "/" + destpath
-	if err = PostManifest(install, dest); err != nil {
+	if err = PostManifest(workdir, cert, dest); err != nil {
 		return errors.Wrapf(err, "Failed writing install.json to %s", dest)
 	}
 
@@ -497,8 +522,10 @@ func getSizeDigest(inUrl string) (string, int64, error) {
 	return getSizeDigestDist(inUrl)
 }
 
-func PostManifest(manifest InstallFile, dest string) error {
-	// TODO not implemented
+func PostManifest(workdir, certPath, dest string) error {
+	// Post the manifest
+	// Post the certificate
+	// Post the signature
 	return nil
 }
 

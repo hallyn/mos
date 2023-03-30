@@ -10,6 +10,15 @@ function teardown() {
   common_teardown
 }
 
+@test "mosctl manifest publish" {
+	write_install_yaml "hostfsonly"
+	./mosb manifest publish --key "${KEYS_DIR}/manifest/privkey.pem" \
+		--cert "${KEYS_DIR}/manifest-ca/cert.pem" \
+		--repo ${ZOT_HOST}:${ZOT_PORT} --name puzzleos/install:1.0.0 \
+		$TMPD/manifest.yaml
+	[ -f $TMPD/zot/puzzleos/install/index.json ]
+}
+
 @test "simple mos install from local zot" {
 	sum=$(manifest_shasum busybox-squashfs)
 	size=$(manifest_size busybox-squashfs)
