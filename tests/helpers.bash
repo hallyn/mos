@@ -4,6 +4,7 @@ function run_git {
 
 export ROOTFS_VERSION="${ROOTFS_VERSION:-0.0.5.230327}"
 export BOOTKIT_URL="${BOOTKIT_URL:-docker://zothub.io/machine/bootkit/bootkit:$ROOTFS_VERSION-squashfs}"
+export TOPDIR="$(git rev-parse --show-toplevel)"
 
 function common_setup {
 	if [ ! -d "${PWD}/zothub" ]; then

@@ -26,6 +26,7 @@ function teardown() {
 	stacker --debug build --layer-type=squashfs \
 		--stacker-file ${ORIG}/tests/livecd2/stacker.yaml \
 		--substitute TMPD=${TMPD} \
+		--substitute TOPDIR=${TOPDIR} \
 		--substitute ZOT_VERSION=1.4.3 \
 		--substitute "ROOTFS_VERSION=${ROOTFS_VERSION}"
 	export PATH=${TMPD}:$PATH
@@ -86,15 +87,8 @@ expect {
 		exit 1
 	}
 }
-send "\n"
-expect "#"
-puts "syncing..."
-send "sync\n"
-expect "#"
-puts "powering off..."
-send "poweroff -f\n"
 expect {
-	"Power down" { puts "powered down" }
+	"Power down" { puts "reboot: Power down" }
 	timeout {
 		puts "timed out"
 		exit 1
@@ -110,6 +104,8 @@ EOF
 	cat > sed1.bash << EOF
 #!/bin/bash
 sed -i 's/provision.iso/install.iso/' \$*
+# There has to be a better way than to delete 6 lines...
+sed -i '/sudi.vfat/,+6d' \$*
 EOF
 	chmod 755 sed1.bash
 	VISUAL=$(pwd)/sed1.bash machine edit "${VMNAME}"
@@ -135,15 +131,8 @@ expect {
 	}
 
 }
-send "\n"
-expect "#"
-puts "syncing..."
-send "sync\n"
-expect "#"
-puts "powering off..."
-send "poweroff -f\n"
 expect {
-	"Power down" { puts "powered down" }
+	"Power down" { puts "reboot: Power down" }
 	timeout {
 		puts "timed out"
 		exit 1
