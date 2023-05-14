@@ -8,9 +8,9 @@ function setup() {
 }
 
 function teardown() {
-	vm_teardown
+	#vm_teardown
 	zot_teardown
-	common_teardown
+	#common_teardown
 }
 
 # 'machine' is expected to be in $PATH, and 'machined' is
@@ -174,14 +174,22 @@ expect {
 }
 send "passw0rd\n"
 expect {
-        "bash" { puts "got shell prompt" }
+        "bash" { puts "got shell" }
+        "root@localhost:" { puts "got shell" }
 	timeout {
-		puts "timed out waiting for password prompt on final boot"
+		puts "timed out waiting for shell on final boot"
 		exit 1
 	}
 }
 send "poweroff -f\n"
-expect "Power down"
+expect {
+	"Power down" { puts "success powering down" }
+	timeout {
+		puts "timed out waiting for shutdown on final boot"
+		exit 1
+	}
+}
 EOF
 	wait_for_vm_down
+	echo "SUCCESS"
 }
