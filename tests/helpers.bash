@@ -2,8 +2,8 @@ function run_git {
     git "$@"
 }
 
-ROOTFS_VERSION="${ROOTFS_VERSION:-0.0.5.230327}"
-BOOTKIT_URL="${BOOTKIT_URL:-docker://zothub.io/machine/bootkit/bootkit:$ROOTFS_VERSION}-squashfs"
+export ROOTFS_VERSION="${ROOTFS_VERSION:-0.0.5.230327}"
+export BOOTKIT_URL="${BOOTKIT_URL:-docker://zothub.io/machine/bootkit/bootkit:$ROOTFS_VERSION-squashfs}"
 
 function common_setup {
 	if [ ! -d "${PWD}/zothub" ]; then

@@ -8,7 +8,7 @@ provision-rootfs-pkg:
   build_only: true
   from:
     type: built
-    tag: provision-base
+    tag: base
   run: |
     pkgtool install udev kmod \
         libsquashfs-dev tpm2-tools cryptsetup
@@ -49,7 +49,7 @@ install-rootfs-pkg:
   build_only: true
   from:
     type: built
-    tag: install-base
+    tag: base
   run: |
     pkgtool install \
         curl \
@@ -69,7 +69,7 @@ target-rootfs:
     type: built
     tag: install-rootfs-pkg
   import:
-    - mosctl
+    - https://github.com/project-machine/mos/releases/download/0.0.10/mosctl
   run: |
     #!/bin/sh -ex
     writefile() {
@@ -97,7 +97,7 @@ install-rootfs:
     type: built
     tag: install-rootfs-pkg
   import:
-    - mosctl
+    - https://github.com/project-machine/mos/releases/download/0.0.10/mosctl
     - https://github.com/project-zot/zot/releases/download/v${{ZOT_VERSION}}/zot-linux-amd64-minimal
     - zot.service
     - zot-config.json

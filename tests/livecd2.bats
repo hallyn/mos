@@ -18,7 +18,8 @@ function teardown() {
 @test "Build and boot provisioning and install ISOs" {
 	set -ex
 	export ZOT_VERSION=1.4.3
-	cp ${ORIG}/tests/livecd2/install-stacker.yaml .
+	cp ${ORIG}/mosctl .
+	cp ${ORIG}/tests/livecd2/stacker.yaml .
 	cp ${ORIG}/tests/livecd2/mos-install* .
 	cp ${ORIG}/tests/livecd2/zot-config.json .
 	cp ${ORIG}/tests/livecd2/zot.service .
@@ -29,7 +30,6 @@ function teardown() {
 		--substitute "ROOTFS_VERSION=${ROOTFS_VERSION}"
 	export PATH=${TMPD}:$PATH
 	cp ${ORIG}/tests/livecd2/build-livecd-rfs .
-	cp ${ORIG}/tests/livecd2/provision* .
 	./build-livecd-rfs --layer oci:oci:provision-rootfs-squashfs \
 	   --output provision.iso
 	cd $TMPD

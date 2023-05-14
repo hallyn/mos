@@ -58,8 +58,6 @@ product_uuid() {
   echo $uuid
 }
 
-BOOTKIT_URL="${BOOTKIT_URL:-docker://zothub.io/machine/bootkit/bootkit:$ROOTFS_VERSION}"
-
 product=$(product_uuid $project)
 rm -f manifest.yaml
 cat > manifest.yaml << EOF
@@ -95,6 +93,9 @@ EOF
 fi
 
 echo "XXX manifest publish start"
+echo "ROOTFS_VERSION is $ROOTFS_VERSION"
+echo "BOOTKIT_URL is $BOOTKIT_URL"
+cat manifest.yaml
 mosb --debug manifest publish \
   --project $project \
   --repo 127.0.0.1:${ZOT_PORT} --name machine/livecd:1.0.0 \
